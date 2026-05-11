@@ -154,6 +154,222 @@ bash scripts/07-install-systemd.sh --enable
 
 ---
 
+## 💻 Windows Local AI Coding Workflow (Tested)
+
+> Tested on HP EliteBook 8 Gi 14-inch, Intel Core Ultra 7 265H, Intel Arc 140T GPU, 64 GB RAM, Windows 11.
+> All inference runs locally — no Anthropic subscription consumed during coding sessions.
+
+### Architecture
+
+```
+Claude Code CLI (Windows host)
+        │
+        ▼  ANTHROPIC_BASE_URL=http://localhost:4000
+LiteLLM proxy  (Docker container, port 4000)
+        │
+        ▼  ollama_chat/qwen2.5-coder:7b
+Ollama.exe     (Windows host, port 11434)
+        │
+        ▼
+Intel Arc 140T GPU  ←  up to 32 GB shared VRAM from 64 GB RAM
+
+Open WebUI  (Docker container, port 3000)  ←  browser UI, same models
+```
+
+### Step 0 — One-time prerequisites
+
+**Install Ollama for Windows** (host-side, once):
+```powershell
+winget install Ollama.Ollama
+# or download from https://ollama.com/download/windows
+```
+
+**Install Docker Desktop** (once):
+```
+https://www.docker.com/products/docker-desktop
+```
+
+**Install Claude Code** (host-side, once — requires Node.js):
+```powershell
+# Check Node.js (comes pre-installed on many machines)
+node --version   # need v18+
+
+# Install Claude Code
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+npm install -g @anthropic-ai/claude-code
+
+# Verify
+claude --version   # should print e.g. 2.1.139 (Claude Code)
+```
+
+**Install GitHub CLI** (once — needed for `gh auth` and PR creation):
+```powershell
+winget install --id GitHub.cli
+gh --version
+```
+
+### Step 1 — Clone and configure
+
+```powershell
+git clone https://github.com/smallscaleserver/EdgeExpert.git
+cd EdgeExpert
+
+# Copy Windows env template
+Copy-Item .env.windows.example .env.windows
+```
+
+Edit `.env.windows` — minimum required changes:
+```ini
+AI_DATA_ROOT=C:/ai-data          # forward slashes; directory must exist
+WEBUI_SECRET_KEY=any-random-string
+LITELLM_MASTER_KEY=sk-changeme   # change this; used as API key by Claude Code
+```
+
+Create the data directory:
+```powershell
+New-Item -ItemType Directory -Force "C:\ai-data\open-webui"
+```
+
+### Step 2 — Run the setup script (as Administrator)
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+.\scripts\win-setup.ps1
+```
+
+This script:
+1. Sets `OLLAMA_HOST=0.0.0.0` (so Docker containers can reach Ollama)
+2. Sets `OLLAMA_MODELS=C:\ai-data\ollama\models` (keeps models off the user profile)
+3. Creates `C:\ai-data\open-webui` and `C:\ai-data\ollama\models`
+4. Restarts Ollama so env vars take effect
+5. Starts Open WebUI via `docker-compose.windows.yml`
+6. Pulls `qwen2.5-coder:7b` (~4.7 GB)
+
+### Step 3 — Check models and stack health
+
+```powershell
+# Confirm Ollama is running and model is available
+ollama list
+# NAME                ID              SIZE
+# qwen2.5-coder:7b    dae161e27b0e    4.7 GB
+
+# Confirm containers are healthy
+docker compose -f docker-compose.windows.yml --env-file .env.windows --env-file .env.versions ps
+# NAMES             STATUS
+# edge-open-webui   Up ... (healthy)
+# edge-litellm      Up ... (healthy)    ← only after make win-cloud
+
+# Test Ollama API
+Invoke-RestMethod http://localhost:11434/api/tags | Select-Object -ExpandProperty models | Select-Object name
+
+# Test LiteLLM (after make win-cloud)
+Invoke-RestMethod http://localhost:4000/health/liveliness
+# I'm alive!
+```
+
+Optional — pull a larger model for better code quality:
+```powershell
+ollama pull qwen2.5-coder:14b   # ~9 GB, noticeably better on multi-file tasks
+ollama pull qwen2.5-coder:32b   # ~20 GB, fits in 64 GB RAM, near-Claude quality
+```
+
+### Step 4 — GitHub auth (one-time)
+
+Required for `git push` and PR creation:
+```powershell
+# Configure git identity
+git config --global user.name  "your-github-username"
+git config --global user.email "your@email.com"
+
+# Authenticate GitHub CLI (browser flow)
+gh auth login
+# Choose: GitHub.com → HTTPS → Login with a web browser
+
+# Verify
+gh auth status
+```
+
+### Step 5 — Start local AI coding session
+
+Start LiteLLM (bridges Claude Code → Ollama):
+```powershell
+make win-cloud
+# or:
+docker compose -f docker-compose.windows.yml --env-file .env.windows --env-file .env.versions --profile cloud up -d
+```
+
+Launch Claude Code with the local model:
+```powershell
+cd C:\your\repo        # any git repo
+make win-claude        # from the EdgeExpert directory
+
+# or from any directory:
+powershell -ExecutionPolicy Bypass -File C:\Edge\edgeexpert\EdgeExpert\scripts\win-claude-local.ps1
+```
+
+Inside Claude Code, use it exactly like the cloud version:
+```
+> Read README.md and add a Quick Start section
+> Add type hints to all functions in src/utils.py
+> Find all TODO comments and create GitHub issues for each
+> Refactor auth.py to use dataclasses, then run the tests
+```
+
+Switch model inside the session with `/model`:
+```
+/model qwen2.5-coder:14b     # upgrade to 14b mid-session
+/model qwen2.5-coder:32b     # or 32b for hardest tasks
+```
+
+### Step 6 — Safe diff / commit / push workflow
+
+**Always review before committing:**
+```powershell
+git status                  # what files changed
+git diff                    # full diff of unstaged changes
+git diff --staged           # what is staged
+git log --oneline -5        # recent commits
+```
+
+**Commit with a conventional message:**
+```powershell
+git add <specific-files>    # stage only what you intend (not git add -A blindly)
+git commit -m "feat(auth): add refresh-token support"
+```
+
+**Push and open a PR:**
+```powershell
+git push origin main
+
+# Or open a PR (requires gh auth):
+gh pr create --title "feat: add refresh-token support" --body "Closes #42"
+gh pr view --web            # open the PR in the browser
+```
+
+**If the AI made a mistake — undo the last commit safely:**
+```powershell
+git reset HEAD~1            # undo commit, keep file changes (soft-ish)
+# review, fix, then re-commit
+```
+
+### Windows daily-ops reference
+
+```powershell
+make win-up       # start Open WebUI only
+make win-cloud    # start Open WebUI + LiteLLM (needed for make win-claude)
+make win-claude   # Claude Code TUI on local Ollama (no Anthropic API used)
+make win-down     # stop all containers
+make win-status   # show container status
+
+ollama list                       # list installed models
+ollama pull qwen2.5-coder:14b     # pull a larger model
+ollama rm  qwen2.5-coder:7b       # free disk space
+```
+
+Open WebUI (browser chat with local models): http://localhost:3000
+
+---
+
 ## 🌐 End-to-end: Web UI → local model → GitHub PR
 
 This is the full Codex / Claude-Code-style loop using **only the browser** for the
