@@ -46,7 +46,7 @@
   "mcp": {
     "ollama-tools": {
       "type": "local",
-      "command": ["python3", "scripts/lib/ollama-mcp-server.py"],
+      "command": ["py", "-3", "scripts/lib/ollama-mcp-server.py"],
       "environment": {
         "OLLAMA_URL": "http://localhost:11434",
         "OLLAMA_DEFAULT_MODEL": "qwen2.5-coder:7b",
