@@ -1,0 +1,57 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama (local)",
+      "options": {
+        "baseURL": "http://localhost:11434/v1"
+      },
+      "models": {
+        "qwen2.5-coder:7b":  { "name": "Qwen2.5 Coder 7B  (local)" },
+        "qwen2.5-coder:14b": { "name": "Qwen2.5 Coder 14B (local)" },
+        "qwen2.5-coder:32b": { "name": "Qwen2.5 Coder 32B (local)" },
+        "deepseek-coder-v2:16b": { "name": "DeepSeek Coder V2 16B (local)" },
+        "llama3.1:8b": { "name": "Llama 3.1 8B (local)" },
+        "gpt-oss:20b":  { "name": "OpenAI gpt-oss 20B (local, video model)" }
+      }
+    },
+    "litellm": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "LiteLLM (cloud via local proxy)",
+      "options": {
+        "baseURL": "http://localhost:4000/v1",
+        "apiKey": "{env:LITELLM_MASTER_KEY}"
+      },
+      "models": {
+        "claude-opus-4-7":   { "name": "Claude Opus 4.7   (cloud)" },
+        "claude-sonnet-4-6": { "name": "Claude Sonnet 4.6 (cloud)" },
+        "claude-haiku-4-5":  { "name": "Claude Haiku 4.5  (cloud)" },
+        "lmstudio":          { "name": "LM Studio (host, via LiteLLM)" }
+      }
+    },
+    "lmstudio": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "LM Studio (host, direct)",
+      "options": {
+        "baseURL": "http://localhost:1234/v1",
+        "apiKey": "lm-studio"
+      },
+      "models": {
+        "openai/gpt-oss-20b": { "name": "LM Studio: gpt-oss 20B (default video model)" }
+      }
+    }
+  },
+  "model": "ollama/qwen2.5-coder:7b",
+  "mcp": {
+    "ollama-tools": {
+      "type": "local",
+      "command": ["python3", "scripts/lib/ollama-mcp-server.py"],
+      "environment": {
+        "OLLAMA_URL": "http://localhost:11434",
+        "OLLAMA_DEFAULT_MODEL": "qwen2.5-coder:7b",
+        "OLLAMA_EMBED_MODEL": "nomic-embed-text"
+      }
+    }
+  }
+}

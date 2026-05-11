@@ -1,0 +1,350 @@
+# =============================================================================
+# edge-model-runtime — Docker Compose
+# =============================================================================
+# Loads two env files at runtime:
+#   .env            (paths, ports, runtime tunables, secrets)
+#   .env.versions   (pinned image tags)
+#
+# Run with: docker compose --env-file .env --env-file .env.versions <cmd>
+# Or use:   bash scripts/01-start.sh
+# =============================================================================
+
+name: edge-model-runtime
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # CORE: Ollama inference server
+  # ---------------------------------------------------------------------------
+  ollama:
+    image: ${OLLAMA_IMAGE}
+    container_name: edge-ollama
+    restart: unless-stopped
+
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-30m}
+      OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL:-1}
+      OLLAMA_MAX_LOADED_MODELS: ${OLLAMA_MAX_LOADED_MODELS:-1}
+      OLLAMA_FLASH_ATTENTION: ${OLLAMA_FLASH_ATTENTION:-1}
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+      NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+
+    # Bind-mount host directory into container.
+    # Models persist on host — container can be rebuilt freely.
+    volumes:
+      - ${AI_DATA_ROOT}/ollama:/root/.ollama
+
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    networks:
+      - edge-ai-net
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # CORE: Open WebUI
+  # ---------------------------------------------------------------------------
+  open-webui:
+    image: ${OPEN_WEBUI_IMAGE}
+    container_name: edge-open-webui
+    restart: unless-stopped
+
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+    ports:
+      - "${WEBUI_PORT:-3000}:8080"
+
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY}
+      ENABLE_SIGNUP: ${WEBUI_ENABLE_SIGNUP:-true}
+      DEFAULT_USER_ROLE: ${WEBUI_DEFAULT_USER_ROLE:-pending}
+      # When the optional `cloud` profile is up, these point at LiteLLM and
+      # cloud models (Claude, etc.) appear in the same model dropdown as
+      # local Ollama models. If LiteLLM is not running, Open WebUI logs a
+      # warning at startup and silently shows only the local models.
+      ENABLE_OPENAI_API: ${ENABLE_OPENAI_API:-true}
+      OPENAI_API_BASE_URL: http://litellm:4000/v1
+      OPENAI_API_KEY: ${LITELLM_MASTER_KEY:-sk-noop}
+
+    volumes:
+      - ${AI_DATA_ROOT}/open-webui:/app/backend/data
+
+    extra_hosts:
+      # So Open WebUI can reach a host-side LM Studio if a user wires it as a
+      # second OpenAI endpoint directly (Settings → Connections). The shared
+      # path through LiteLLM does not need this, but having it costs nothing
+      # and avoids a confusing "Connection refused" the first time someone
+      # tries the direct route.
+      - "host.docker.internal:host-gateway"
+
+    networks:
+      - edge-ai-net
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "2"
+
+  # ---------------------------------------------------------------------------
+  # OPTIONAL: LiteLLM proxy — exposes cloud LLMs (Claude, GPT, Gemini …)
+  # as an OpenAI-compatible endpoint so Open WebUI shows them in the same
+  # model dropdown as local Ollama models. Opt-in: requires API keys and
+  # an explicit profile because outbound traffic is involved.
+  #
+  # Enable: bash scripts/32-setup-cloud-models.sh    (one-time wizard)
+  # Or:     docker compose --profile cloud up -d litellm
+  # ---------------------------------------------------------------------------
+  litellm:
+    image: ${LITELLM_IMAGE}
+    container_name: edge-litellm
+    profiles: ["cloud"]
+    restart: unless-stopped
+
+    ports:
+      - "${LITELLM_PORT:-4000}:4000"
+
+    environment:
+      # Reads cloud provider keys from .env. Empty values disable that provider
+      # in the proxy (LiteLLM reports `unauthorized` for that model only).
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_PROVIDER_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # Master key clients (Open WebUI, opencode, curl, …) must present.
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
+      LITELLM_LOG: ${LITELLM_LOG:-INFO}
+      # Host-side LM Studio bridge. config.yaml reads these via os.environ.
+      # Defaults are no-ops when LM Studio isn't running (the entry only
+      # fails at call time, not at proxy startup).
+      LMSTUDIO_BASE_URL: http://${LMSTUDIO_HOST:-host.docker.internal}:${LMSTUDIO_PORT:-1234}/v1
+      LMSTUDIO_MODEL: ${LMSTUDIO_MODEL:-openai/gpt-oss-20b}
+      LMSTUDIO_API_KEY: ${LMSTUDIO_API_KEY:-lm-studio}
+
+    command:
+      - --config=/app/config.yaml
+      - --port=4000
+      - --host=0.0.0.0
+
+    volumes:
+      - ./litellm/config.yaml:/app/config.yaml:ro
+
+    extra_hosts:
+      # Lets LiteLLM reach a host-side LM Studio (default :1234) at
+      # http://host.docker.internal:1234. No-op when LM Studio isn't running —
+      # LiteLLM only resolves it on demand.
+      - "host.docker.internal:host-gateway"
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4000/health/liveliness || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+    networks:
+      - edge-ai-net
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "2"
+
+  # ---------------------------------------------------------------------------
+  # OPTIONAL: vLLM (HuggingFace, faster inference)
+  # Enable: docker compose --profile vllm up -d vllm
+  # ---------------------------------------------------------------------------
+  vllm:
+    image: ${VLLM_IMAGE}
+    container_name: edge-vllm
+    profiles: ["vllm"]
+    restart: unless-stopped
+
+    ports:
+      - "${VLLM_PORT:-8000}:8000"
+
+    environment:
+      HF_HOME: /root/.cache/huggingface
+      HF_TOKEN: ${HF_TOKEN:-}
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+      NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+
+    volumes:
+      - ${AI_DATA_ROOT}/hf-cache:/root/.cache/huggingface
+
+    command:
+      - --host=0.0.0.0
+      - --port=8000
+      - --model=${VLLM_MODEL:-Qwen/Qwen2.5-Coder-7B-Instruct}
+      - --max-model-len=${VLLM_MAX_MODEL_LEN:-4096}
+      - --gpu-memory-utilization=${VLLM_GPU_MEM_UTIL:-0.90}
+
+    ipc: host
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+    networks:
+      - edge-ai-net
+
+  # ---------------------------------------------------------------------------
+  # OPTIONAL: OpenHands — agentic web IDE (Option E in docs/AI-CODING-SETUP.md)
+  #
+  # Browser UI ที่ทำงานแบบ Codex / Claude Code Web: เลือก repo, สั่ง agent
+  # clone/แก้/run test/commit/push. ใช้ models ผ่าน LiteLLM proxy ที่มีอยู่
+  # (Claude, Qwen, Nemotron) — เลือกใน Settings ของ OpenHands เอง.
+  #
+  # Spawns sandbox containers via the host docker socket — that's why
+  # `/var/run/docker.sock` is bind-mounted. Sandbox runtime image is pulled
+  # on demand by OpenHands itself, controlled by AGENT_SERVER_IMAGE_TAG.
+  #
+  # Enable: bash scripts/36-setup-coding-web.sh    (one-time wizard)
+  # Or:     docker compose --profile coding-web up -d openhands
+  # ---------------------------------------------------------------------------
+  openhands:
+    image: ${OPENHANDS_IMAGE}
+    container_name: edge-openhands
+    profiles: ["coding-web"]
+    restart: unless-stopped
+
+    ports:
+      - "${OPENHANDS_PORT:-3030}:3000"
+
+    environment:
+      # Sandbox/runtime image OpenHands spawns per session via Docker socket.
+      AGENT_SERVER_IMAGE_REPOSITORY: ${OPENHANDS_AGENT_IMAGE_REPO:-ghcr.io/openhands/agent-server}
+      AGENT_SERVER_IMAGE_TAG: ${OPENHANDS_AGENT_IMAGE_TAG}
+      LOG_ALL_EVENTS: "true"
+      # Default LLM endpoint = LiteLLM proxy on the shared compose network.
+      # Users can still change this in the OpenHands settings UI; this just
+      # pre-fills the form so first-run works without manual config.
+      LLM_BASE_URL: ${OPENHANDS_LLM_BASE_URL:-http://litellm:4000}
+      LLM_API_KEY: ${LITELLM_MASTER_KEY:-}
+      # GitHub OAuth (optional). Without these set, the OpenHands UI lets you
+      # paste a fine-grained PAT in Settings as a fallback. To enable OAuth:
+      #   https://github.com/settings/developers → New OAuth App
+      #   Authorization callback URL:
+      #     http://<host>:${OPENHANDS_PORT:-3030}/api/integrations/github/callback
+      GITHUB_APP_CLIENT_ID: ${GITHUB_APP_CLIENT_ID:-}
+      GITHUB_APP_CLIENT_SECRET: ${GITHUB_APP_CLIENT_SECRET:-}
+      # Sandbox/agent-server configuration.
+      # SANDBOX_HOST_PORT: port on which THIS container is reachable from the
+      #   agent-server containers (via host.docker.internal). Must match
+      #   OPENHANDS_PORT so webhook callbacks reach OpenHands, not Open WebUI.
+      SANDBOX_HOST_PORT: "${OPENHANDS_PORT:-3030}"
+      # OH_PERMITTED_CORS_ORIGINS: passed as OH_ALLOW_CORS_ORIGINS_0 to every
+      #   spawned agent-server so the browser's cross-origin preflight is
+      #   accepted. Must match the URL the browser uses to reach OpenHands.
+      # Value must be a JSON array string (the OH_ env parser calls json.loads).
+      OH_PERMITTED_CORS_ORIGINS: '["${OPENHANDS_HOST_URL:-http://localhost:3030}"]'
+      # SANDBOX_CONTAINER_URL_PATTERN: URL template the frontend uses to reach
+      #   agent-server exposed ports (VNC, VS Code, etc.). Replace {port} with
+      #   the host-mapped port. Default localhost:{port} breaks on remote access.
+      SANDBOX_CONTAINER_URL_PATTERN: "http://192.168.1.6:{port}"
+
+    volumes:
+      # Docker socket: required so OpenHands can launch sandbox containers.
+      # This effectively gives OpenHands root on the host — only enable on
+      # trusted hardware. Same trust model as any docker-in-docker tool.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # State: chats, settings, OAuth tokens. Lives on host so it survives
+      # `docker compose down` — same pattern as ollama/open-webui.
+      - ${AI_DATA_ROOT}/openhands:/.openhands
+
+    extra_hosts:
+      # Lets OpenHands reach services bound to the host (not strictly needed
+      # when LLM_BASE_URL points at the in-network litellm service, but kept
+      # so users who flip LLM_BASE_URL to a host port still work).
+      - "host.docker.internal:host-gateway"
+
+    networks:
+      - edge-ai-net
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "2"
+
+  # ---------------------------------------------------------------------------
+  # OPTIONAL: Training (PyTorch interactive shell)
+  # Enable: docker compose --profile training run --rm training bash
+  # ---------------------------------------------------------------------------
+  training:
+    image: ${TRAINING_IMAGE}
+    container_name: edge-training
+    profiles: ["training"]
+    restart: "no"
+
+    environment:
+      HF_HOME: /root/.cache/huggingface
+      HF_TOKEN: ${HF_TOKEN:-}
+      WANDB_API_KEY: ${WANDB_API_KEY:-}
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+      NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+
+    volumes:
+      - ${AI_DATA_ROOT}/training:/workspace/training
+      - ${AI_DATA_ROOT}/hf-cache:/root/.cache/huggingface
+      - ./training:/workspace/scripts:ro
+
+    working_dir: /workspace/training
+
+    command: bash
+    stdin_open: true
+    tty: true
+    ipc: host
+
+    ports:
+      - "${TENSORBOARD_PORT:-6006}:6006"
+      - "${JUPYTER_PORT:-8888}:8888"
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+    networks:
+      - edge-ai-net
+
+networks:
+  edge-ai-net:
+    name: edge-ai-net
+    driver: bridge

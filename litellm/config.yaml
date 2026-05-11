@@ -1,0 +1,117 @@
+# =============================================================================
+# litellm/config.yaml — LiteLLM proxy model registry
+# =============================================================================
+# Defines which cloud models the proxy exposes. Each `model_name` is the
+# public id seen by clients (Open WebUI dropdown, opencode, curl). The
+# `litellm_params.model` field tells LiteLLM which provider/model to call.
+#
+# Provider keys are read from the container env (set in .env, see
+# .env.example). Models whose key is empty will fail at call-time with a
+# clear "missing api key" error — they still show up in the catalogue but
+# are inert. That's intentional: edit this file to remove what you don't
+# want to see.
+#
+# Reload after editing: `docker compose --profile cloud up -d --force-recreate litellm`
+# =============================================================================
+
+model_list:
+  # --- Anthropic (Claude) ----------------------------------------------------
+  - model_name: claude-opus-4-7
+    litellm_params:
+      model: anthropic/claude-opus-4-7
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: claude-sonnet-4-6
+    litellm_params:
+      model: anthropic/claude-sonnet-4-6
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: claude-haiku-4-5
+    litellm_params:
+      model: anthropic/claude-haiku-4-5-20251001
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  # --- Local Ollama (exposed through LiteLLM so Anthropic-format clients ----
+  # like Claude Code can hit them via `/v1/messages`).
+  #
+  # The `model_name` is the public id the client picks; `model:` tells
+  # LiteLLM which Ollama tag to call. `api_base` points at the Ollama
+  # service on the shared compose network (`edge-ai-net`).
+  #
+  # Edit / add entries to match what `ollama list` shows on the host. The
+  # tags below are the ones recommended in docs/MODEL-RECOMMENDATIONS.md.
+  - model_name: qwen2.5-coder
+    litellm_params:
+      model: ollama_chat/qwen2.5-coder:7b
+      api_base: http://ollama:11434
+
+  - model_name: qwen2.5-coder-large
+    litellm_params:
+      model: ollama_chat/qwen2.5-coder:32b
+      api_base: http://ollama:11434
+
+  - model_name: nemotron-nano
+    litellm_params:
+      model: ollama_chat/nemotron3:nano-instruct
+      api_base: http://ollama:11434
+
+  # OpenAI's open-weights gpt-oss model, served by Ollama. The same model id
+  # the YouTube clip (https://www.youtube.com/watch?v=Cyn_Dm05_eU) uses with
+  # LM Studio — pulling via Ollama is the equivalent flow on this stack and
+  # plays nicely with `claude-local-gpt-oss` (Option D).
+  - model_name: gpt-oss
+    litellm_params:
+      model: ollama_chat/gpt-oss:20b
+      api_base: http://ollama:11434
+
+  # --- LM Studio (host-side desktop app) -------------------------------------
+  # LM Studio (https://lmstudio.ai) runs on the host as a desktop app, not in
+  # a container. It exposes an OpenAI-compatible endpoint at
+  # http://<host>:1234/v1. We reach it via `host.docker.internal` (set in
+  # docker-compose.yml under extra_hosts on the litellm service).
+  #
+  # `LMSTUDIO_*` env vars come from .env (see .env.example). The model id
+  # LM Studio reports literally contains a slash (e.g. "openai/gpt-oss-20b"),
+  # so we tell LiteLLM the provider via `custom_llm_provider: openai` and pass
+  # the full model id as-is — otherwise LiteLLM would strip the leading
+  # "openai/" and the request would 404 in LM Studio.
+  #
+  # To switch the loaded model, change LMSTUDIO_MODEL in .env then:
+  #   docker compose --profile cloud up -d --force-recreate litellm
+  # Or just run `bash scripts/37-setup-lmstudio.sh` again.
+  - model_name: lmstudio
+    litellm_params:
+      model: os.environ/LMSTUDIO_MODEL
+      api_base: os.environ/LMSTUDIO_BASE_URL
+      api_key: os.environ/LMSTUDIO_API_KEY
+      custom_llm_provider: openai
+
+  # --- OpenAI ----------------------------------------------------------------
+  # Uncomment after setting OPENAI_PROVIDER_API_KEY in .env.
+  # - model_name: gpt-4o
+  #   litellm_params:
+  #     model: openai/gpt-4o
+  #     api_key: os.environ/OPENAI_API_KEY
+  # - model_name: gpt-4o-mini
+  #   litellm_params:
+  #     model: openai/gpt-4o-mini
+  #     api_key: os.environ/OPENAI_API_KEY
+
+  # --- Google Gemini ---------------------------------------------------------
+  # Uncomment after setting GEMINI_API_KEY in .env.
+  # - model_name: gemini-1.5-pro
+  #   litellm_params:
+  #     model: gemini/gemini-1.5-pro
+  #     api_key: os.environ/GEMINI_API_KEY
+
+litellm_settings:
+  # Drop unsupported params silently rather than 400-ing the client. Open
+  # WebUI sometimes sends OpenAI-only fields (e.g. `frequency_penalty`) to
+  # Anthropic models, which would otherwise fail.
+  drop_params: true
+  # Surface upstream provider errors verbatim instead of LiteLLM's wrapper.
+  set_verbose: false
+
+general_settings:
+  # Clients must present this as the OpenAI API key. Set in .env.
+  master_key: os.environ/LITELLM_MASTER_KEY

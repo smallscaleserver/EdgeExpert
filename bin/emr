@@ -1,0 +1,225 @@
+#!/usr/bin/env bash
+# =============================================================================
+# emr — single CLI entry point for edge-model-runtime
+# =============================================================================
+# Wraps the lifecycle-numbered scripts under scripts/ as named subcommands so
+# the day-to-day flow feels like Claude Code / ChatGPT Codex:
+#
+#     emr install              first-time setup
+#     emr start | up           start core services
+#     emr stop  | down         stop core services
+#     emr status               health check
+#     emr pull <model>         download an Ollama model
+#     emr nemotron [variant]   download a Nemotron variant
+#     emr models               list installed models
+#     emr rm <model>           remove a model
+#     emr run <model>          interactive CLI with a model
+#     emr disk                 disk-usage breakdown
+#     emr update               pull latest pinned image versions
+#     emr sync                 sync models.txt registry
+#     emr cleanup [--full]     L2 cleanup (containers + images, keep models)
+#     emr wipe                 L3 cleanup (DELETE EVERYTHING incl. models)
+#     emr uninstall            interactive uninstall menu
+#     emr setup <profile>      AI coding profile bootstrap (see below)
+#     emr verify-patch <file>  apply a Web-Codex unified diff
+#     emr aider                run the aider AI coding CLI (pass all remaining args)
+#     emr systemd-install      install systemd service for edge-model-runtime
+#     emr systemd-uninstall    uninstall systemd service for edge-model-runtime
+#     emr backup               backup secrets (.env and .env.versions) with optional GPG encryption
+#     emr help [<cmd>]         this message, or details for a subcommand
+#
+# Profiles for `emr setup`:
+#     opencode                 OpenCode TUI (Option A, 100% local)
+#     claude-code              Claude Code + cloud, Ollama as MCP worker (B)
+#     cloud-models             LiteLLM proxy → Claude/GPT/Gemini in WebUI (C)
+#     claude-local [model]     Claude Code TUI on local Ollama (D)
+#     coding-web               OpenHands web IDE (E)
+#     lmstudio                 Share LM Studio via LiteLLM (F-shared)
+#     claude-lmstudio          Claude Code TUI on LM Studio direct (F-direct)
+#     hooks                    install repo git hooks
+#
+# All subcommands shell out to the existing scripts/*.sh files — this is a
+# façade, not a rewrite. The numbered scripts remain the source of truth.
+# =============================================================================
+
+set -euo pipefail
+
+# Resolve repo root relative to this script (works when symlinked into
+# /usr/local/bin/emr — readlink -f walks the symlink to bin/emr in the repo).
+SELF="$(readlink -f "${BASH_SOURCE[0]}")"
+REPO_ROOT="$(cd "$(dirname "$SELF")/.." && pwd)"
+SCRIPTS="$REPO_ROOT/scripts"
+
+# shellcheck source=../scripts/lib/common.sh
+source "$SCRIPTS/lib/common.sh"
+
+usage() {
+  cat <<'EOF'
+Usage:  emr <command> [args]
+
+Lifecycle:
+  install              first-time setup (creates .env, pulls core images)
+  start | up           start core services
+  stop  | down         stop core services
+  status               health check
+  update               pull pinned image updates and recreate containers
+
+Models:
+  pull <model[:tag]>   download an Ollama model
+  nemotron [variant]   download a Nemotron variant (default: nano)
+  models               list installed models
+  rm <model[:tag]>     remove a model
+  run <model[:tag]>    interactive CLI with a model
+  sync                 sync models.txt registry
+  disk                 disk usage breakdown
+
+Cleanup:
+  cleanup              L2: remove containers + images, keep models
+  cleanup --full       L2 + remove host wrappers + MCP registrations
+  wipe                 L3: DELETE EVERYTHING including models (typed confirm)
+  uninstall            interactive uninstall menu
+
+AI coding profiles:
+  setup opencode                       Option A — OpenCode TUI, 100% local
+  setup claude-code                    Option B — Claude Code + cloud subscription, Ollama-as-worker (B)
+  setup cloud-models                   Option C — Claude/GPT/Gemini in WebUI
+  setup claude-local [model]           Option D — Claude Code TUI on local Ollama via LiteLLM (D)
+  setup coding-web                     Option E — OpenHands web IDE (E)
+  setup lmstudio                       Option F-shared — LM Studio via LiteLLM (F-shared)
+  setup claude-lmstudio                Option F-direct — Claude Code on LM Studio (F-direct)
+  setup hooks                          install repo git hooks
+
+Patch flow:
+  apply-patch <patch> [opts]           apply a Web-Codex unified diff
+
+Secrets:
+  backup               backup secrets (.env and .env.versions) with optional GPG encryption
+
+Systemd:
+  systemd-install      install systemd service for edge-model-runtime
+  systemd-uninstall    uninstall systemd service for edge-model-runtime
+
+Misc:
+  aider                run the aider AI coding CLI (pass all remaining args)
+  help [<command>]         show this help
+  version                              show emr version
+
+For long-form docs:  README.md, docs/AI-CODING-SETUP.md
+EOF
+}
+
+cmd="${1:-help}"; shift || true
+
+case "$cmd" in
+  install)        exec bash "$SCRIPTS/00-install.sh" "$@" ;;
+  start|up)       exec bash "$SCRIPTS/01-start.sh" "$@" ;;
+  stop|down)      exec bash "$SCRIPTS/02-stop.sh" "$@" ;;
+  status|verify)  exec bash "$SCRIPTS/03-verify.sh" "$@" ;;
+  pull)
+                  [[ $# -ge 1 ]] || die "Usage: emr pull <model[:tag]>"
+                  exec bash "$SCRIPTS/04-pull-model.sh" "$@" ;;
+  sync)           exec bash "$SCRIPTS/04b-sync-models.sh" "$@" ;;
+  models|list)    exec bash "$SCRIPTS/05-list-models.sh" "$@" ;;
+  rm|remove)
+                  [[ $# -ge 1 ]] || die "Usage: emr rm <model[:tag]>"
+                  exec bash "$SCRIPTS/06-remove-model.sh" "$@" ;;
+  run)
+                  [[ $# -ge 1 ]] || die "Usage: emr run <model[:tag]>"
+                  exec bash "$SCRIPTS/07-run-model.sh" "$@" ;;
+  disk)           exec bash "$SCRIPTS/08-disk-report.sh" "$@" ;;
+  update)         exec bash "$SCRIPTS/09-update-images.sh" "$@" ;;
+  nemotron)       exec bash "$SCRIPTS/0a-pull-nemotron.sh" "$@" ;;
+
+  cleanup)
+                  if [[ "${1:-}" == "--full" ]]; then
+                    shift
+                    bash "$SCRIPTS/10-cleanup-docker.sh" "$@"
+                    exec bash "$SCRIPTS/11-remove-host-tools.sh" --silent-if-empty
+                  else
+                    exec bash "$SCRIPTS/10-cleanup-docker.sh" "$@"
+                  fi
+                  ;;
+  wipe)           exec bash "$SCRIPTS/20-wipe-models.sh" "$@" ;;
+  uninstall)      exec bash "$SCRIPTS/uninstall.sh" "$@" ;;
+
+  setup)
+                  profile="${1:-}"; shift || true
+                  case "$profile" in
+                    opencode)         exec bash "$SCRIPTS/30-setup-opencode.sh" "$@" ;;
+                    claude-code)      exec bash "$SCRIPTS/31-setup-claude-code.sh" "$@" ;;
+                    cloud-models)     exec bash "$SCRIPTS/32-setup-cloud-models.sh" "$@" ;;
+                    claude-local)     exec bash "$SCRIPTS/33-setup-claude-local.sh" "$@" ;;
+                    coding-web)       exec bash "$SCRIPTS/36-setup-coding-web.sh" "$@" ;;
+                    lmstudio)         exec bash "$SCRIPTS/37-setup-lmstudio.sh" "$@" ;;
+                    claude-lmstudio)  exec bash "$SCRIPTS/38-setup-claude-lmstudio.sh" "$@" ;;
+                    hooks)            exec bash "$SCRIPTS/34-install-hooks.sh" "$@" ;;
+                    ""|help|-h|--help)
+                      cat <<'EOF'
+Usage:  emr setup <profile> [args]
+
+Profiles:
+  opencode                       OpenCode TUI (Option A, 100% local)
+  claude-code                    Claude Code + cloud subscription, Ollama-as-worker (B)
+  cloud-models                   LiteLLM proxy → cloud LLMs in Open WebUI (C)
+  claude-local [model]           Claude Code TUI on local Ollama via LiteLLM (D)
+  coding-web                     OpenHands agentic web IDE (E)
+  lmstudio                       Surface host LM Studio in LiteLLM (F-shared)
+  claude-lmstudio                Claude Code TUI on LM Studio (F-direct)
+  hooks                          Install repo git hooks (commit-msg, pre-commit)
+
+Full guide: docs/AI-CODING-SETUP.md
+EOF
+                      ;;
+                    *) die "Unknown setup profile: $profile (try: emr setup help)" ;;
+                  esac
+                  ;;
+
+  apply-patch)
+                  exec bash "$SCRIPTS/35-apply-web-patch.sh" "$@" ;;
+
+  aider)
+                  exec bash "$SCRIPTS/06-coding-cli.sh" "$@" ;;
+
+  systemd-install)
+                  exec bash "$SCRIPTS/07-install-systemd.sh" "$@" ;;
+
+  systemd-uninstall)
+                  exec bash "$SCRIPTS/17-uninstall-systemd.sh" "$@" ;;
+
+  backup)
+                  exec bash "$SCRIPTS/19-backup-secrets.sh" "$@" ;;
+
+  version|--version|-v)
+                  cd "$REPO_ROOT"
+                  if git rev-parse --short HEAD >/dev/null 2>&1; then
+                    printf 'emr (edge-model-runtime) %s\n' "$(git rev-parse --short HEAD)"
+                  else
+                    printf 'emr (edge-model-runtime)\n'
+                  fi
+                  ;;
+
+  help|--help|-h|"")
+                  if [[ $# -ge 1 ]]; then
+                    sub="$1"
+                    case "$sub" in
+                      install)    bash "$SCRIPTS/00-install.sh" --help 2>/dev/null || head -20 "$SCRIPTS/00-install.sh" ;;
+                      pull)       sed -n '/Usage:/,/Browse models/p' "$SCRIPTS/04-pull-model.sh" ;;
+                      apply-patch) sed -n '/Usage:/,/-----/p' "$SCRIPTS/35-apply-web-patch.sh" ;;
+                      aider)      bash "$SCRIPTS/06-coding-cli.sh" --help 2>/dev/null || head -20 "$SCRIPTS/06-coding-cli.sh" ;;
+                      systemd-install) bash "$SCRIPTS/07-install-systemd.sh" --help 2>/dev/null || head -20 "$SCRIPTS/07-install-systemd.sh" ;;
+                      systemd-uninstall) bash "$SCRIPTS/17-uninstall-systemd.sh" --help 2>/dev/null || head -20 "$SCRIPTS/17-uninstall-systemd.sh" ;;
+                      backup)     bash "$SCRIPTS/19-backup-secrets.sh" --help 2>/dev/null || head -20 "$SCRIPTS/19-backup-secrets.sh" ;;
+                      *)          usage ;;
+                    esac
+                  else
+                    usage
+                  fi
+                  ;;
+
+  *)
+                  err "Unknown command: $cmd"
+                  log ""
+                  usage
+                  exit 2
+                  ;;
+esac

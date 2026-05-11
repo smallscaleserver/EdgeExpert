@@ -1,0 +1,31 @@
+# =============================================================================
+# models.txt — declarative registry of models for this stack
+# =============================================================================
+# One model per line. Format:   [provider:]model[:tag]
+#
+#   - Lines starting with '#' are comments.
+#   - Prefix a line with '!' to disable an entry (kept here for visibility,
+#     but skipped by sync).
+#   - 'provider:' is optional. Today only 'ollama:' is supported. Other
+#     prefixes ('vllm:', 'hf:') are reserved for future profiles.
+#   - Note: model tags also use ':' (e.g. 'llama3.2:3b'). Only known provider
+#     prefixes are stripped — the rest is treated as the model spec.
+#
+# Workflow:
+#   bash scripts/04b-sync-models.sh        # pull every enabled model
+#   bash scripts/06-remove-model.sh <m>    # actually delete a model
+#
+# Disabling vs removing:
+#   '!' = stop pulling, but DO NOT delete from disk.
+#   To free disk, use 06-remove-model.sh explicitly.
+# =============================================================================
+
+# Examples (uncomment / edit as needed):
+# ollama:qwen2.5-coder:7b
+# ollama:llama3.2:3b
+# !ollama:mistral:7b
+
+# AI-assisted coding (see docs/AI-CODING-SETUP.md):
+# ollama:qwen2.5-coder:7b      # default coding model for OpenCode / Claude MCP
+# ollama:nomic-embed-text      # only needed if you call ollama_embed
+# ollama:gpt-oss:20b           # OpenAI open-weights, ~13 GB; equivalent of the LM Studio model in youtube.com/watch?v=Cyn_Dm05_eU — pair with `bash scripts/33-setup-claude-local.sh gpt-oss`
