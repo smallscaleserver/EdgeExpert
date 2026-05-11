@@ -1,0 +1,76 @@
+# =============================================================================
+# litellm/config.windows.yaml — LiteLLM config for Windows-native Ollama mode
+# =============================================================================
+# Same as config.yaml but Ollama API base points at host.docker.internal
+# instead of the 'ollama' container service (which doesn't exist in
+# docker-compose.windows.yml).
+#
+# Used by: docker-compose.windows.yml → litellm service
+# =============================================================================
+
+model_list:
+  # --- Anthropic (Claude) ----------------------------------------------------
+  - model_name: claude-opus-4-7
+    litellm_params:
+      model: anthropic/claude-opus-4-7
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: claude-sonnet-4-6
+    litellm_params:
+      model: anthropic/claude-sonnet-4-6
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: claude-haiku-4-5
+    litellm_params:
+      model: anthropic/claude-haiku-4-5-20251001
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  # --- Local Ollama (Windows host) -------------------------------------------
+  # api_base points at host.docker.internal because Ollama runs as ollama.exe
+  # on Windows — not as a container on this compose network.
+  - model_name: qwen2.5-coder
+    litellm_params:
+      model: ollama_chat/qwen2.5-coder:7b
+      api_base: http://host.docker.internal:11434
+
+  - model_name: qwen2.5-coder-large
+    litellm_params:
+      model: ollama_chat/qwen2.5-coder:32b
+      api_base: http://host.docker.internal:11434
+
+  - model_name: nemotron-nano
+    litellm_params:
+      model: ollama_chat/nemotron3:nano-instruct
+      api_base: http://host.docker.internal:11434
+
+  - model_name: gpt-oss
+    litellm_params:
+      model: ollama_chat/gpt-oss:20b
+      api_base: http://host.docker.internal:11434
+
+  # --- LM Studio (Windows host) ----------------------------------------------
+  - model_name: lmstudio
+    litellm_params:
+      model: os.environ/LMSTUDIO_MODEL
+      api_base: os.environ/LMSTUDIO_BASE_URL
+      api_key: os.environ/LMSTUDIO_API_KEY
+      custom_llm_provider: openai
+
+  # --- OpenAI ----------------------------------------------------------------
+  # - model_name: gpt-4o
+  #   litellm_params:
+  #     model: openai/gpt-4o
+  #     api_key: os.environ/OPENAI_API_KEY
+
+  # --- Google Gemini ---------------------------------------------------------
+  # - model_name: gemini-1.5-pro
+  #   litellm_params:
+  #     model: gemini/gemini-1.5-pro
+  #     api_key: os.environ/GEMINI_API_KEY
+
+litellm_settings:
+  drop_params: true
+  set_verbose: false
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY

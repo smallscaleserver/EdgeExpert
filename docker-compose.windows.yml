@@ -1,0 +1,124 @@
+# =============================================================================
+# docker-compose.windows.yml — Windows-native Ollama mode
+# =============================================================================
+# Use this file when Ollama runs as ollama.exe on the Windows host (not in
+# Docker). This file provides only Open WebUI and the optional LiteLLM proxy.
+# Ollama itself is NOT a service here — it lives on the host at port 11434.
+#
+# Supported hosts:
+#   HP EliteBook / any Windows 11 laptop  → Ollama.exe with Intel Arc or CPU
+#   Any Windows machine with Docker Desktop
+#
+# Usage:
+#   docker compose -f docker-compose.windows.yml \
+#     --env-file .env.windows --env-file .env.versions up -d
+#
+# Or via Makefile:
+#   make win-up           # core (Open WebUI only)
+#   make win-cloud        # core + LiteLLM cloud proxy
+#
+# Quick-start:
+#   1. Install Ollama for Windows from https://ollama.com/download
+#   2. Set OLLAMA_HOST=0.0.0.0 (see docs/WINDOWS-SETUP.md)
+#   3. cp .env.windows.example .env.windows  (edit AI_DATA_ROOT)
+#   4. make win-up
+#   5. Open http://localhost:3000
+# =============================================================================
+
+name: edge-model-runtime
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # CORE: Open WebUI — talks to Ollama on the Windows host
+  # host.docker.internal resolves to the Windows host from inside a container.
+  # Docker Desktop for Windows provides this DNS name automatically.
+  # ---------------------------------------------------------------------------
+  open-webui:
+    image: ${OPEN_WEBUI_IMAGE}
+    container_name: edge-open-webui
+    restart: unless-stopped
+
+    ports:
+      - "${WEBUI_PORT:-3000}:8080"
+
+    environment:
+      # Point at Ollama running natively on the Windows host
+      OLLAMA_BASE_URL: http://host.docker.internal:${OLLAMA_PORT:-11434}
+      WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY}
+      ENABLE_SIGNUP: ${WEBUI_ENABLE_SIGNUP:-true}
+      DEFAULT_USER_ROLE: ${WEBUI_DEFAULT_USER_ROLE:-pending}
+      # LiteLLM proxy on host port (only active when the cloud profile is up)
+      ENABLE_OPENAI_API: ${ENABLE_OPENAI_API:-true}
+      OPENAI_API_BASE_URL: http://host.docker.internal:${LITELLM_PORT:-4000}/v1
+      OPENAI_API_KEY: ${LITELLM_MASTER_KEY:-sk-noop}
+
+    volumes:
+      - ${AI_DATA_ROOT}/open-webui:/app/backend/data
+
+    networks:
+      - edge-ai-net
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "2"
+
+  # ---------------------------------------------------------------------------
+  # OPTIONAL: LiteLLM proxy — adds Claude / GPT / Gemini to the WebUI dropdown
+  # Also re-exposes local Ollama models so Claude Code / OpenCode can reach them
+  # via an Anthropic-compatible endpoint.
+  #
+  # Enable: make win-cloud
+  # ---------------------------------------------------------------------------
+  litellm:
+    image: ${LITELLM_IMAGE}
+    container_name: edge-litellm
+    profiles: ["cloud"]
+    restart: unless-stopped
+
+    ports:
+      - "${LITELLM_PORT:-4000}:4000"
+
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_PROVIDER_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
+      LITELLM_LOG: ${LITELLM_LOG:-INFO}
+      # Ollama on the Windows host (not a container service on this file)
+      OLLAMA_BASE_URL: http://host.docker.internal:${OLLAMA_PORT:-11434}
+      # LM Studio on the Windows host (if running)
+      LMSTUDIO_BASE_URL: http://host.docker.internal:${LMSTUDIO_PORT:-1234}/v1
+      LMSTUDIO_MODEL: ${LMSTUDIO_MODEL:-openai/gpt-oss-20b}
+      LMSTUDIO_API_KEY: ${LMSTUDIO_API_KEY:-lm-studio}
+
+    command:
+      - --config=/app/config.yaml
+      - --port=4000
+      - --host=0.0.0.0
+
+    volumes:
+      - ./litellm/config.windows.yaml:/app/config.yaml:ro
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4000/health/liveliness || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+    networks:
+      - edge-ai-net
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "2"
+
+networks:
+  edge-ai-net:
+    name: edge-ai-net
+    driver: bridge

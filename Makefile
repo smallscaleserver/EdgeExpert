@@ -5,7 +5,8 @@ SHELL := /usr/bin/env bash
         setup lint test format verify quick-check hooks-install \
         ai-review ai-fix ai-pr \
         up down webui codex claude-local claude-cloud claude-lmstudio \
-        cloud-models lmstudio apply-patch
+        cloud-models lmstudio apply-patch \
+        win-up win-down win-cloud win-status win-test
 
 help:
 	@echo "Stack lifecycle (the unified entry point is bin/emr):"
@@ -17,6 +18,14 @@ help:
 	@echo "  make cleanup       - remove containers + images + host wrappers (keeps models)"
 	@echo "  make wipe          - DELETE EVERYTHING incl. models (typed confirmation)"
 	@echo "  make uninstall     - interactive uninstall menu"
+	@echo ""
+	@echo "Windows-native Ollama mode (no WSL2 required):"
+	@echo "  make win-up        - start Open WebUI (connects to ollama.exe on host)"
+	@echo "  make win-down      - stop Windows stack"
+	@echo "  make win-cloud     - start Open WebUI + LiteLLM cloud proxy"
+	@echo "  make win-status    - show container status (Windows mode)"
+	@echo "  make win-test      - validate docker-compose.windows.yml config"
+	@echo "  See docs/WINDOWS-SETUP.md for full setup instructions."
 	@echo ""
 	@echo "AI coding entry points (pick one):"
 	@echo "  make codex          - launch OpenCode TUI (Option A, 100% local, edits files & runs gh)"
@@ -135,6 +144,29 @@ cloud-models:
 
 lmstudio:
 	bash scripts/37-setup-lmstudio.sh
+
+# ---------------------------------------------------------------------------
+# Windows-native Ollama mode — Ollama runs as ollama.exe on the Windows host.
+# These targets use docker-compose.windows.yml + .env.windows + .env.versions.
+# See docs/WINDOWS-SETUP.md for prerequisites.
+# ---------------------------------------------------------------------------
+WIN_COMPOSE = docker compose -f docker-compose.windows.yml \
+              --env-file .env.windows --env-file .env.versions
+
+win-up:
+	$(WIN_COMPOSE) up -d
+
+win-down:
+	$(WIN_COMPOSE) down
+
+win-cloud:
+	$(WIN_COMPOSE) --profile cloud up -d
+
+win-status:
+	$(WIN_COMPOSE) ps
+
+win-test:
+	$(WIN_COMPOSE) config > /dev/null && echo "docker-compose.windows.yml OK"
 
 # Usage: make apply-patch P=/tmp/web.patch [COMMIT=1 PUSH=1 PR=1] [FORCE=1] [MSG="subject"]
 # MSG is forwarded as a single argument so spaces/quotes survive, e.g.:

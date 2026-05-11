@@ -3,8 +3,9 @@
 > Production-grade Docker runtime for running and training local LLMs on NVIDIA edge machines — MSI EdgeXpert, NVIDIA DGX Spark, or any Ubuntu + NVIDIA host.
 
 Tested on:
-- **MSI EdgeXpert** (x86_64, discrete GPU)
+- **MSI EdgeXpert** (x86_64, discrete NVIDIA GPU)
 - **NVIDIA DGX Spark** (arm64/aarch64, GB10 / DGX OS 7.x, kernel 6.17 nvidia)
+- **HP EliteBook / Windows 11 laptop** (Intel Arc GPU — Windows-native Ollama mode)
 - Generic Ubuntu 22.04+ with NVIDIA Container Toolkit
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -36,15 +37,28 @@ This stack runs local LLMs (Ollama + Open WebUI) with optional vLLM and PyTorch 
 
 ## 📋 Requirements
 
+### Linux / DGX / MSI EdgeXpert (original mode)
+
 | Component | Version |
 |-----------|---------|
 | Ubuntu Linux (or DGX OS) | 22.04+ / DGX OS 7.x |
 | Architecture | `x86_64` or `arm64` (aarch64) |
 | Docker Engine | 24.0+ |
 | Docker Compose | v2.20+ |
-| NVIDIA Driver | 535+ (any driver shipped with DGX OS works) |
+| NVIDIA Driver | 535+ |
 | NVIDIA Container Toolkit | latest |
-| Data disk | any path with ≥ 100 GB free, set via `AI_DATA_ROOT` in `.env` |
+| Data disk | ≥ 100 GB free, set via `AI_DATA_ROOT` in `.env` |
+
+### Windows (laptop / desktop — no WSL2 required)
+
+| Component | Version |
+|-----------|---------|
+| Windows 11 | 22H2+ |
+| Docker Desktop | 4.20+ |
+| Ollama for Windows | latest |
+| GPU | Intel Arc / NVIDIA / CPU (all supported by Ollama.exe) |
+
+> **Windows quick-start**: see [`docs/WINDOWS-SETUP.md`](./docs/WINDOWS-SETUP.md)
 
 > **DGX Spark note:** DGX OS ships with Docker + NVIDIA Container Toolkit pre-installed, so you can skip the toolkit install below. Verify with `docker info | grep -i runtime` — you should see `nvidia`.
 
@@ -88,14 +102,32 @@ Recommended values for `AI_DATA_ROOT`:
 
 ## 🚀 Quick Start
 
+### Windows (Ollama native — recommended for laptops)
+
+```powershell
+# 1. Install Ollama for Windows  →  https://ollama.com/download/windows
+# 2. Set OLLAMA_HOST=0.0.0.0 as a Machine env var, restart Ollama
+# 3. Install Docker Desktop  →  https://www.docker.com/products/docker-desktop
+
+git clone https://github.com/smallscaleserver/EdgeExpert.git
+cd EdgeExpert
+Copy-Item .env.windows.example .env.windows   # edit AI_DATA_ROOT and WEBUI_SECRET_KEY
+make win-up                                    # starts Open WebUI at http://localhost:3000
+ollama pull qwen2.5-coder:7b                   # pull a model
+```
+
+Full guide: [`docs/WINDOWS-SETUP.md`](./docs/WINDOWS-SETUP.md)
+
+### Linux / Ubuntu / DGX Spark / MSI EdgeXpert
+
 ```bash
 # 1. Clone
-git clone https://github.com/coinbaseblock/edge-model-runtime.git
-cd edge-model-runtime
+git clone https://github.com/smallscaleserver/EdgeExpert.git
+cd EdgeExpert
 
-# 2. Configure: copy .env.example to .env and set AI_DATA_ROOT for your host
+# 2. Configure: copy .env.example to .env and set AI_DATA_ROOT and GPU_DRIVER
 cp .env.example .env
-$EDITOR .env   # set AI_DATA_ROOT (see "Data Layout" above)
+$EDITOR .env   # set AI_DATA_ROOT and GPU_DRIVER (nvidia | intel | cpu)
 
 # 3. Install (first time only)
 bash scripts/00-install.sh
