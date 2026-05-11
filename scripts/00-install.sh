@@ -90,11 +90,25 @@ ok "Data directories ready under $AI_DATA_ROOT"
 section "📦 Pulling core Docker images"
 : "${OLLAMA_IMAGE:?OLLAMA_IMAGE missing in .env.versions}"
 : "${OPEN_WEBUI_IMAGE:?OPEN_WEBUI_IMAGE missing in .env.versions}"
-: "${CUDA_TEST_IMAGE:?CUDA_TEST_IMAGE missing in .env.versions}"
 
-docker pull "$OLLAMA_IMAGE"
+# For Intel GPU mode, pull the ipex-llm image instead of stock Ollama.
+# For NVIDIA mode, also pull the CUDA test image for the GPU sanity check.
+GPU_DRIVER="${GPU_DRIVER:-cpu}"
+case "$GPU_DRIVER" in
+  nvidia)
+    : "${CUDA_TEST_IMAGE:?CUDA_TEST_IMAGE missing in .env.versions}"
+    docker pull "$OLLAMA_IMAGE"
+    docker pull "$CUDA_TEST_IMAGE"
+    ;;
+  intel)
+    : "${OLLAMA_INTEL_IMAGE:?OLLAMA_INTEL_IMAGE missing in .env.versions}"
+    docker pull "$OLLAMA_INTEL_IMAGE"
+    ;;
+  cpu|*)
+    docker pull "$OLLAMA_IMAGE"
+    ;;
+esac
 docker pull "$OPEN_WEBUI_IMAGE"
-docker pull "$CUDA_TEST_IMAGE"
 ok "Images pulled"
 
 info "vLLM and training images are NOT pulled here (large). Pull on demand:"
@@ -102,14 +116,35 @@ info "  docker compose --profile vllm pull vllm"
 info "  docker compose --profile training pull training"
 
 # --- 7. GPU sanity check -----------------------------------------------------
-section "🎮 GPU check"
-if docker run --rm --gpus all "$CUDA_TEST_IMAGE" nvidia-smi >/dev/null 2>&1; then
-  gpu_count="$(docker run --rm --gpus all "$CUDA_TEST_IMAGE" nvidia-smi -L | wc -l)"
-  ok "GPU OK — $gpu_count device(s) visible"
-else
-  warn "GPU not accessible from Docker. Check NVIDIA Container Toolkit."
-  warn "Containers will fall back to CPU (much slower)."
-fi
+section "🎮 GPU check (GPU_DRIVER=${GPU_DRIVER})"
+case "$GPU_DRIVER" in
+  nvidia)
+    if docker run --rm --gpus all "$CUDA_TEST_IMAGE" nvidia-smi >/dev/null 2>&1; then
+      gpu_count="$(docker run --rm --gpus all "$CUDA_TEST_IMAGE" nvidia-smi -L | wc -l)"
+      ok "NVIDIA GPU OK — $gpu_count device(s) visible"
+    else
+      warn "NVIDIA GPU not accessible from Docker. Check NVIDIA Container Toolkit:"
+      warn "  https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html"
+      warn "Containers will fall back to CPU (much slower)."
+    fi
+    ;;
+  intel)
+    if ls /dev/dri/renderD128 >/dev/null 2>&1; then
+      ok "Intel GPU device found: /dev/dri/renderD128"
+    else
+      warn "/dev/dri/renderD128 not found."
+      warn "On WSL2: ensure GPU-PV is enabled (Windows 11 + Intel Arc driver 31.0.101.x+)"
+      warn "  and run 'wsl --update' to get a recent WSL2 kernel."
+      warn "Ollama will run CPU-only until the device is accessible."
+    fi
+    ;;
+  cpu)
+    ok "CPU-only mode — no GPU acceleration (expected for GPU_DRIVER=cpu)"
+    ;;
+  *)
+    warn "Unknown GPU_DRIVER='$GPU_DRIVER'. Valid values: cpu | nvidia | intel"
+    ;;
+esac
 
 # --- 8. Start core stack -----------------------------------------------------
 section "🐳 Starting core services"

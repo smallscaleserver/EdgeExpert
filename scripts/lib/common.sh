@@ -46,11 +46,30 @@ load_env() {
 }
 
 # --- Compose wrapper ---------------------------------------------------------
-# Always passes both env files. Usage: compose up -d
+# Always passes both env files and auto-selects the GPU platform overlay
+# based on GPU_DRIVER in .env:
+#   cpu    (default) → docker-compose.yml only (no GPU reservation)
+#   nvidia           → merges docker-compose.nvidia.yml
+#   intel            → merges docker-compose.intel.yml (Intel Arc / ipex-llm)
+# Usage: compose up -d
 compose() {
   local args=()
   [[ -f "$REPO_ROOT/.env" ]]          && args+=(--env-file "$REPO_ROOT/.env")
   [[ -f "$REPO_ROOT/.env.versions" ]] && args+=(--env-file "$REPO_ROOT/.env.versions")
+
+  # Read GPU_DRIVER from .env without sourcing (avoids side-effects at call time)
+  local gpu_driver="cpu"
+  if [[ -f "$REPO_ROOT/.env" ]]; then
+    gpu_driver=$(awk -F= '/^[[:space:]]*GPU_DRIVER[[:space:]]*=/{v=$2; gsub(/[[:space:]"'"'"']/, "", v); print v; exit}' "$REPO_ROOT/.env")
+    gpu_driver="${gpu_driver:-cpu}"
+  fi
+
+  local overlay="$REPO_ROOT/docker-compose.${gpu_driver}.yml"
+  if [[ "$gpu_driver" != "cpu" && -f "$overlay" ]]; then
+    # Explicit -f flags: base file first, then overlay (Compose merges in order)
+    args+=(-f "$REPO_ROOT/docker-compose.yml" -f "$overlay")
+  fi
+
   ( cd "$REPO_ROOT" && docker compose "${args[@]}" "$@" )
 }
 

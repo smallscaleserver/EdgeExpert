@@ -1,0 +1,38 @@
+# =============================================================================
+# docker-compose.intel.yml — Intel Arc GPU overlay
+# =============================================================================
+# Activated when GPU_DRIVER=intel in .env.
+# The compose() wrapper in scripts/lib/common.sh merges this file automatically:
+#   docker compose -f docker-compose.yml -f docker-compose.intel.yml ...
+#
+# Uses Intel's ipex-llm image which bundles Ollama with Intel oneAPI/SYCL
+# acceleration. Exposes the same Ollama API (/api/*) as the stock image.
+# OLLAMA_INTEL_IMAGE is pinned in .env.versions.
+#
+# Requirements (WSL2 on Windows):
+#   1. Windows 11 with GPU-PV (Intel Arc driver 31.0.101.x+)
+#   2. WSL2 kernel 5.10.102+ (run: wsl --update)
+#   3. Inside WSL2, verify GPU is visible:
+#        ls /dev/dri/renderD128
+#   4. Intel compute-runtime is provided by the ipex-llm image itself —
+#      no host install needed when using this Docker image.
+#
+# Recommended model sizes for Intel Arc 140T (32 GB shared VRAM from 64 GB RAM):
+#   qwen2.5-coder:7b   ~4 GB   fast, fits easily
+#   qwen2.5-coder:14b  ~9 GB   good balance
+#   qwen2.5-coder:32b  ~20 GB  fits but leaves little headroom
+# =============================================================================
+
+services:
+  ollama:
+    image: ${OLLAMA_INTEL_IMAGE}
+    devices:
+      - /dev/dri:/dev/dri
+    group_add:
+      - "render"
+      - "video"
+    environment:
+      OLLAMA_INTEL_GPU: "1"
+      DEVICE: Arc
+      # Expose all Intel GPU devices inside the container
+      ONEAPI_DEVICE_SELECTOR: level_zero:*

@@ -1,0 +1,8 @@
+.env
+.env.ci
+*.swp
+*.swo
+.DS_Store
+__pycache__/
+*.pyc
+.pr-notes.md
