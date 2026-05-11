@@ -6,7 +6,7 @@ SHELL := /usr/bin/env bash
         ai-review ai-fix ai-pr \
         up down webui codex claude-local claude-cloud claude-lmstudio \
         cloud-models lmstudio apply-patch \
-        win-up win-down win-cloud win-status win-test
+        win-up win-down win-cloud win-status win-test win-claude
 
 help:
 	@echo "Stack lifecycle (the unified entry point is bin/emr):"
@@ -25,6 +25,7 @@ help:
 	@echo "  make win-cloud     - start Open WebUI + LiteLLM cloud proxy"
 	@echo "  make win-status    - show container status (Windows mode)"
 	@echo "  make win-test      - validate docker-compose.windows.yml config"
+	@echo "  make win-claude    - Claude Code TUI using local Ollama model (no Anthropic subscription)"
 	@echo "  See docs/WINDOWS-SETUP.md for full setup instructions."
 	@echo ""
 	@echo "AI coding entry points (pick one):"
@@ -167,6 +168,9 @@ win-status:
 
 win-test:
 	$(WIN_COMPOSE) config > /dev/null && echo "docker-compose.windows.yml OK"
+
+win-claude:
+	powershell -ExecutionPolicy Bypass -File scripts\win-claude-local.ps1
 
 # Usage: make apply-patch P=/tmp/web.patch [COMMIT=1 PUSH=1 PR=1] [FORCE=1] [MSG="subject"]
 # MSG is forwarded as a single argument so spaces/quotes survive, e.g.:
