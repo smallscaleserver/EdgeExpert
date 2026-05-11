@@ -1,63 +1,56 @@
-irm https://ollama.com/install.ps1 | iex
+# EdgeExpert — Windows Quick Reference
 
+## Architecture (Windows mode)
+  Ollama.exe  (Windows host, port 11434)  ← Intel Arc 140T GPU auto
+  Open WebUI  (Docker,  port 3000)        ← browser UI
+  LiteLLM     (Docker,  port 4000)        ← optional cloud proxy (make win-cloud)
 
+## First-time setup (run once as Admin)
+  Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+  .\scripts\win-setup.ps1
 
+## Daily commands
+  make win-up        # start Open WebUI
+  make win-down      # stop
+  make win-status    # check containers
+  make win-cloud     # start with LiteLLM cloud proxy (Claude/GPT/Gemini in WebUI)
 
+## Ollama (runs on Windows host)
+  ollama list
+  ollama pull qwen2.5-coder:7b
+  ollama pull qwen2.5-coder:14b   # better quality (~9 GB)
+  ollama pull qwen2.5-coder:32b   # best (~20 GB, fits in 64 GB RAM)
+  ollama rm <model>
 
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+## Claude Code (coding agent — installed on Windows)
+  # First time: login
+  claude login
 
-\scripts\win-setup.ps1
+  # Use in any git repo
+  cd C:\path\to\repo
+  claude
 
-taskkill /F /IM "Docker Desktop.exe" 2>$null
-taskkill /F /IM "com.docker.backend.exe" 2>$null
-taskkill /F /IM "com.docker.service.exe" 2>$null
-taskkill /F /IM "docker.exe" 2>$null
-taskkill /F /IM "docker-sandbox.exe" 2>$null
-taskkill /F /IM "vpnkit.exe" 2>$null
-taskkill /F /IM "wslhost.exe" 2>$null
+  # One-shot task
+  claude -p "add type hints to utils.py and commit"
 
-Get-Process *docker* | Select-Object Id,ProcessName,Path
+## Models path
+  C:\ai-data\ollama\models    ← OLLAMA_MODELS (set by win-setup.ps1)
+  C:\ai-data\open-webui       ← WebUI database
 
-Stop-Process -Id 24864 -Force
+## Docker Desktop troubleshooting
+  # Kill everything and restart
+  taskkill /F /IM "Docker Desktop.exe" 2>$null
+  taskkill /F /IM "com.docker.backend.exe" 2>$null
+  wsl --shutdown
+  Stop-Service com.docker.service -Force -ErrorAction SilentlyContinue
+  Start-Sleep -Seconds 3
+  Start-Service com.docker.service
+  # Then reopen Docker Desktop from Start Menu
 
-Stop-Service com.docker.service -Force -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 3
-Start-Service com.docker.service
+  # Check WSL distros
+  wsl -l -v
 
-wsl --shutdown
-
-cd "C:\Program Files\Docker\cli-plugins"
-ren docker-sandbox.exe docker-sandbox.exe.disabled
-
-cd "C:\Program Files\Docker\cli-plugins"
-ren docker-sandbox.exe.disabled docker-sandbox.exe
-
-
-icacls "C:\Program Files\Docker\cli-plugins\docker-sandbox.exe"
-
-
-
-takeown /F "C:\Program Files\Docker\cli-plugins\docker-sandbox.exe"
-icacls "C:\Program Files\Docker\cli-plugins\docker-sandbox.exe" /grant Administrators:F
-
-
-ren "C:\Program Files\Docker\cli-plugins\docker-sandbox.exe" "docker-sandbox.exe.disabled"
-
-wsl -l -v
-
-docker-desktop
-docker-desktop-data
-
-taskkill /F /IM "Docker Desktop.exe" 2>$null
-taskkill /F /IM "com.docker.backend.exe" 2>$null
-taskkill /F /IM "com.docker.service.exe" 2>$null
-taskkill /F /IM "docker.exe" 2>$null
-taskkill /F /IM "docker-sandbox.exe" 2>$null
-wsl --shutdown
-Stop-Service com.docker.service -Force -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 3
-Start-Service com.docker.service
-
-cd "C:\Program Files\Docker\cli-plugins"
-ren docker-sandbox.exe docker-sandbox.exe.disabled
-
+  # Reset docker-sandbox if needed (run as Admin)
+  takeown /F "C:\Program Files\Docker\cli-plugins\docker-sandbox.exe"
+  icacls "C:\Program Files\Docker\cli-plugins\docker-sandbox.exe" /grant Administrators:F
+  ren "C:\Program Files\Docker\cli-plugins\docker-sandbox.exe" "docker-sandbox.exe.disabled"
