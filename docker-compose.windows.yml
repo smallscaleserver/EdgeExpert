@@ -85,7 +85,11 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_PROVIDER_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
+      # LITELLM_MASTER_KEY is intentionally NOT set here.
+      # When this env var is present LiteLLM ≥1.50 enables virtual-key auth
+      # which requires a connected database. Omitting it keeps LiteLLM open
+      # on localhost (no database needed). Provider keys above handle upstream
+      # auth; client auth is not needed for a local-only proxy.
       LITELLM_LOG: ${LITELLM_LOG:-INFO}
       # Ollama on the Windows host (not a container service on this file)
       OLLAMA_BASE_URL: http://host.docker.internal:${OLLAMA_PORT:-11434}

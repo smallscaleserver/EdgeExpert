@@ -6,7 +6,7 @@ SHELL := /usr/bin/env bash
         ai-review ai-fix ai-pr \
         up down webui codex claude-local claude-cloud claude-lmstudio \
         cloud-models lmstudio apply-patch \
-        win-up win-down win-cloud win-status win-test win-claude
+        win-up win-down win-cloud win-status win-test win-claude win-claude-direct
 
 help:
 	@echo "Stack lifecycle (the unified entry point is bin/emr):"
@@ -171,6 +171,9 @@ win-test:
 
 win-claude:
 	powershell -ExecutionPolicy Bypass -File scripts\win-claude-local.ps1
+
+win-claude-direct:
+	powershell -ExecutionPolicy Bypass -File scripts\win-claude-local.ps1 -Direct
 
 # Usage: make apply-patch P=/tmp/web.patch [COMMIT=1 PUSH=1 PR=1] [FORCE=1] [MSG="subject"]
 # MSG is forwarded as a single argument so spaces/quotes survive, e.g.:

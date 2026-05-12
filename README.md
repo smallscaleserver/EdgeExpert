@@ -298,14 +298,29 @@ make win-cloud
 docker compose -f docker-compose.windows.yml --env-file .env.windows --env-file .env.versions --profile cloud up -d
 ```
 
-Launch Claude Code with the local model:
+Launch Claude Code — choose one mode:
+
+**Local AI (no Anthropic account needed):**
 ```powershell
 cd C:\your\repo        # any git repo
 make win-claude        # from the EdgeExpert directory
 
 # or from any directory:
 powershell -ExecutionPolicy Bypass -File C:\Edge\edgeexpert\EdgeExpert\scripts\win-claude-local.ps1
+powershell -ExecutionPolicy Bypass -File C:\Edge\edgeexpert\EdgeExpert\scripts\win-claude-local.ps1 -Model qwen2.5-coder-large
 ```
+
+**Real Anthropic API (login session or API key):**
+```powershell
+make win-claude-direct        # from the EdgeExpert directory
+
+# or from any directory:
+powershell -ExecutionPolicy Bypass -File C:\Edge\edgeexpert\EdgeExpert\scripts\win-claude-local.ps1 -Direct
+powershell -ExecutionPolicy Bypass -File C:\Edge\edgeexpert\EdgeExpert\scripts\win-claude-local.ps1 -Direct -Model claude-sonnet-4-6
+```
+
+> **First time with `-Direct`?** Run `claude` once and type `/login` to save your Anthropic session,  
+> or set `ANTHROPIC_API_KEY=sk-ant-...` in `.env.windows`.
 
 Inside Claude Code, use it exactly like the cloud version:
 ```
@@ -355,11 +370,12 @@ git reset HEAD~1            # undo commit, keep file changes (soft-ish)
 ### Windows daily-ops reference
 
 ```powershell
-make win-up       # start Open WebUI only
-make win-cloud    # start Open WebUI + LiteLLM (needed for make win-claude)
-make win-claude   # Claude Code TUI on local Ollama (no Anthropic API used)
-make win-down     # stop all containers
-make win-status   # show container status
+make win-up             # start Open WebUI only
+make win-cloud          # start Open WebUI + LiteLLM (needed for make win-claude)
+make win-claude         # Claude Code TUI → local Ollama (no Anthropic account needed)
+make win-claude-direct  # Claude Code TUI → real Anthropic API (login or API key)
+make win-down           # stop all containers
+make win-status         # show container status
 
 ollama list                       # list installed models
 ollama pull qwen2.5-coder:14b     # pull a larger model
