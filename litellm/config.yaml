@@ -157,5 +157,10 @@ litellm_settings:
   drop_params: true
   # Surface upstream provider errors verbatim instead of LiteLLM's wrapper.
   set_verbose: false
+  # Large local models on CPU can take many minutes per request.
+  # Set generous timeouts so Claude Code agentic tasks don't get cut off.
+  request_timeout: 7200    # 2 hours
+  stream_timeout: 7200     # 2 hours (streaming responses)
 
-general_settings: {}
+general_settings:
+  max_request_timeout: 7200
