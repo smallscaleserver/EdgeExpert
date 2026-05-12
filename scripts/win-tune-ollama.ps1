@@ -40,14 +40,15 @@ if ($Upgrade) {
 
 # --- Step 1: persist env vars to User registry (survives reboots) ----------
 # Thread budget: 16 logical processors on Core Ultra 7 265H
-#   10 for Ollama  -> model runs, machine stays usable
-#    6 for Windows OS, UI, Docker, browser -> no freeze
+#    8 for Ollama  -> model runs steadily
+#    8 for Windows OS, UI, Docker, browser -> machine stays responsive
+# RAM is not limited - user has 64GB and is fine using most of it.
 $persistVars = @{
     OLLAMA_FLASH_ATTENTION   = "1"    # faster attention, less RAM usage
-    OLLAMA_NUM_THREAD        = "10"   # leave 6 threads for OS/UI (was 16 = freeze)
-    OLLAMA_NUM_PARALLEL      = "1"    # one request at a time, focus all threads
+    OLLAMA_NUM_THREAD        = "8"    # 8 threads: inference runs, OS stays smooth
+    OLLAMA_NUM_PARALLEL      = "1"    # one request at a time, all 8 threads to it
     OLLAMA_MAX_LOADED_MODELS = "1"    # one model resident, no thrashing
-    OLLAMA_KEEP_ALIVE        = "60m"  # keep model warm 60 min (was 30m)
+    OLLAMA_KEEP_ALIVE        = "60m"  # keep model warm 60 min
 }
 
 Write-Host "  Persisting env vars..." -ForegroundColor Yellow
@@ -125,13 +126,13 @@ foreach ($m in $models) {
         continue
     }
 
-    # 16k context: enough for multi-file agentic tasks, uses ~half the RAM of 32k
-    # num_thread=10: leaves 6 threads for OS/UI so machine stays responsive
-    $modelfile = "FROM $($m.tag)`nPARAMETER num_ctx 16384`nPARAMETER num_thread 10"
+    # 32k context: full RAM budget (user has 64GB, RAM is not a concern)
+    # num_thread=8: 8 threads for inference, 8 left for OS/UI
+    $modelfile = "FROM $($m.tag)`nPARAMETER num_ctx 32768`nPARAMETER num_thread 8"
     $tmpFile = "$tmpDir\$($m.name -replace ':','-').modelfile"
     Set-Content -Path $tmpFile -Value $modelfile -Encoding UTF8
 
-    Write-Host "  Creating $($m.name)-32k (16k ctx, 10 threads) ..." -ForegroundColor Cyan
+    Write-Host "  Creating $($m.name)-32k (32k ctx, 8 threads) ..." -ForegroundColor Cyan
     & $ollamaExe create "$($m.name)-32k" -f $tmpFile 2>&1 | Where-Object { $_ -match "success|error|Error" }
 }
 
