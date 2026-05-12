@@ -59,6 +59,11 @@ model_list:
       model: ollama/qwen2.5-coder:7b
       api_base: http://ollama:11434
 
+  - model_name: qwen2.5-coder-32k
+    litellm_params:
+      model: ollama/qwen2.5-coder-32k
+      api_base: http://ollama:11434
+
   - model_name: qwen2.5-coder:14b
     litellm_params:
       model: ollama/qwen2.5-coder:14b
@@ -84,6 +89,11 @@ model_list:
   - model_name: devstral
     litellm_params:
       model: ollama/devstral
+      api_base: http://ollama:11434
+
+  - model_name: devstral-32k
+    litellm_params:
+      model: ollama/devstral-32k
       api_base: http://ollama:11434
 
   # --- OpenAI open-weights ---------------------------------------------------
