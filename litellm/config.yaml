@@ -40,28 +40,28 @@ model_list:
   #
   # Edit / add entries to match what `ollama list` shows on the host. The
   # tags below are the ones recommended in docs/MODEL-RECOMMENDATIONS.md.
+  # NOTE: use `ollama/` not `ollama_chat/` — Claude Code sends content as an
+  # array (tool results, multi-turn), which ollama_chat rejects with
+  # "cannot unmarshal array into Go struct field ... content of type string".
+  # The `ollama/` provider handles array content correctly.
   - model_name: qwen2.5-coder
     litellm_params:
-      model: ollama_chat/qwen2.5-coder:7b
+      model: ollama/qwen2.5-coder:7b
       api_base: http://ollama:11434
 
   - model_name: qwen2.5-coder-large
     litellm_params:
-      model: ollama_chat/qwen2.5-coder:32b
+      model: ollama/qwen2.5-coder:32b
       api_base: http://ollama:11434
 
   - model_name: nemotron-nano
     litellm_params:
-      model: ollama_chat/nemotron3:nano-instruct
+      model: ollama/nemotron3:nano-instruct
       api_base: http://ollama:11434
 
-  # OpenAI's open-weights gpt-oss model, served by Ollama. The same model id
-  # the YouTube clip (https://www.youtube.com/watch?v=Cyn_Dm05_eU) uses with
-  # LM Studio — pulling via Ollama is the equivalent flow on this stack and
-  # plays nicely with `claude-local-gpt-oss` (Option D).
   - model_name: gpt-oss
     litellm_params:
-      model: ollama_chat/gpt-oss:20b
+      model: ollama/gpt-oss:20b
       api_base: http://ollama:11434
 
   # --- LM Studio (host-side desktop app) -------------------------------------

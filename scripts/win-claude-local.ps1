@@ -25,11 +25,16 @@
 # =============================================================================
 
 param(
-    [string]$Model      = "qwen2.5-coder",
+    [string]$Model      = "",           # default depends on mode: claude-sonnet-4-6 (direct) or qwen2.5-coder (local)
     [string]$LiteLLMUrl = "http://localhost:4000",
     [string]$ApiKey     = "sk-local",
-    [switch]$Direct     # bypass LiteLLM — use real Anthropic API directly
+    [switch]$Direct     # bypass LiteLLM - use real Anthropic API directly
 )
+
+# Set model default based on mode if not explicitly provided
+if ($Model -eq "") {
+    $Model = if ($Direct) { "claude-sonnet-4-6" } else { "qwen2.5-coder" }
+}
 
 # Read overrides from .env.windows if present
 $envFile = Join-Path $PSScriptRoot "..\env.windows" -Resolve -ErrorAction SilentlyContinue
@@ -51,7 +56,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 # ==========================================================================
 if ($Direct) {
     Write-Host ""
-    Write-Host "  Claude Code  →  Anthropic API (direct)" -ForegroundColor Green
+    Write-Host "  Claude Code -> Anthropic API (direct)" -ForegroundColor Green
 
     if ($RealAnthropicKey) {
         $env:ANTHROPIC_API_KEY = $RealAnthropicKey
@@ -59,7 +64,7 @@ if ($Direct) {
     } else {
         # No API key — rely on saved /login session token
         Remove-Item Env:\ANTHROPIC_API_KEY -ErrorAction SilentlyContinue
-        Write-Host "  No ANTHROPIC_API_KEY found — using saved login session (/login if needed)" -ForegroundColor Yellow
+        Write-Host "  No ANTHROPIC_API_KEY found - using saved login session (/login if needed)" -ForegroundColor Yellow
     }
 
     # Make sure we are NOT pointing at LiteLLM
@@ -89,7 +94,7 @@ try {
 }
 
 Write-Host ""
-Write-Host "  Claude Code  →  LiteLLM ($LiteLLMUrl)  →  Ollama (local)" -ForegroundColor Cyan
+Write-Host "  Claude Code -> LiteLLM ($LiteLLMUrl) -> Ollama (local)" -ForegroundColor Cyan
 Write-Host "  Model: $Model" -ForegroundColor Cyan
 Write-Host "  Press Ctrl+C to exit" -ForegroundColor DarkGray
 Write-Host ""
