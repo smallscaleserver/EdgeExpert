@@ -39,11 +39,15 @@ if ($Upgrade) {
 }
 
 # --- Step 1: persist env vars to User registry (survives reboots) ----------
+# Thread budget: 16 logical processors on Core Ultra 7 265H
+#   10 for Ollama  -> model runs, machine stays usable
+#    6 for Windows OS, UI, Docker, browser -> no freeze
 $persistVars = @{
-    OLLAMA_FLASH_ATTENTION   = "1"    # faster attention kernel
-    OLLAMA_NUM_PARALLEL      = "1"    # one request at a time, all resources to it
-    OLLAMA_MAX_LOADED_MODELS = "1"    # one model fully resident
-    OLLAMA_KEEP_ALIVE        = "30m"  # keep model warm between requests
+    OLLAMA_FLASH_ATTENTION   = "1"    # faster attention, less RAM usage
+    OLLAMA_NUM_THREAD        = "10"   # leave 6 threads for OS/UI (was 16 = freeze)
+    OLLAMA_NUM_PARALLEL      = "1"    # one request at a time, focus all threads
+    OLLAMA_MAX_LOADED_MODELS = "1"    # one model resident, no thrashing
+    OLLAMA_KEEP_ALIVE        = "60m"  # keep model warm 60 min (was 30m)
 }
 
 Write-Host "  Persisting env vars..." -ForegroundColor Yellow
@@ -58,6 +62,31 @@ Write-Host ""
 Write-Host "  Restarting ollama serve..." -ForegroundColor Yellow
 Get-Process -Name "ollama*" -ErrorAction SilentlyContinue | Stop-Process -Force
 Start-Sleep -Seconds 3
+
+# Detect where model blobs actually live and fix OLLAMA_MODELS if wrong.
+# The registry may point to C:\ai-data\ollama\models (empty) while the real
+# blobs are in the default ~/.ollama/models — correct it automatically.
+$registryPath = [System.Environment]::GetEnvironmentVariable('OLLAMA_MODELS', 'User')
+if (-not $registryPath) { $registryPath = [System.Environment]::GetEnvironmentVariable('OLLAMA_MODELS', 'Machine') }
+$defaultPath  = "$env:USERPROFILE\.ollama\models"
+$aiDataPath   = "C:\ai-data\ollama\models"
+
+# Pick path where blobs actually exist
+if (Test-Path "$defaultPath\blobs") {
+    $actualPath = $defaultPath
+} elseif ($registryPath -and (Test-Path "$registryPath\blobs")) {
+    $actualPath = $registryPath
+} else {
+    $actualPath = $defaultPath  # fallback
+}
+
+if ($registryPath -ne $actualPath) {
+    Write-Host "  Fixing OLLAMA_MODELS: $registryPath -> $actualPath" -ForegroundColor Yellow
+    [System.Environment]::SetEnvironmentVariable('OLLAMA_MODELS', $actualPath, 'User')
+    [System.Environment]::SetEnvironmentVariable('OLLAMA_MODELS', $actualPath, 'Machine')
+}
+[System.Environment]::SetEnvironmentVariable('OLLAMA_MODELS', $actualPath, 'Process')
+Write-Host "  OLLAMA_MODELS = $actualPath" -ForegroundColor Green
 
 # Start serve directly (not the tray app) so env vars are inherited
 Start-Process -FilePath $ollamaExe -ArgumentList "serve" -WindowStyle Hidden
@@ -96,11 +125,13 @@ foreach ($m in $models) {
         continue
     }
 
-    $modelfile = "FROM $($m.tag)`nPARAMETER num_ctx 32768`nPARAMETER num_thread 16"
+    # 16k context: enough for multi-file agentic tasks, uses ~half the RAM of 32k
+    # num_thread=10: leaves 6 threads for OS/UI so machine stays responsive
+    $modelfile = "FROM $($m.tag)`nPARAMETER num_ctx 16384`nPARAMETER num_thread 10"
     $tmpFile = "$tmpDir\$($m.name -replace ':','-').modelfile"
     Set-Content -Path $tmpFile -Value $modelfile -Encoding UTF8
 
-    Write-Host "  Creating $($m.name)-32k ..." -ForegroundColor Cyan
+    Write-Host "  Creating $($m.name)-32k (16k ctx, 10 threads) ..." -ForegroundColor Cyan
     & $ollamaExe create "$($m.name)-32k" -f $tmpFile 2>&1 | Where-Object { $_ -match "success|error|Error" }
 }
 

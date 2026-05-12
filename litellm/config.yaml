@@ -169,8 +169,8 @@ litellm_settings:
   set_verbose: false
   # Large local models on CPU can take many minutes per request.
   # Set generous timeouts so Claude Code agentic tasks don't get cut off.
-  request_timeout: 7200    # 2 hours
-  stream_timeout: 7200     # 2 hours (streaming responses)
+  request_timeout: 21600    # 2 hours
+  stream_timeout: 21600     # 2 hours (streaming responses)
 
 general_settings:
-  max_request_timeout: 7200
+  max_request_timeout: 21600
