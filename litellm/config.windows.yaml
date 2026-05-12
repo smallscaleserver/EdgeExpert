@@ -32,24 +32,73 @@ model_list:
   # NOTE: use `ollama/` not `ollama_chat/` — Claude Code sends content as an
   # array (tool results, multi-turn), which ollama_chat rejects with
   # "cannot unmarshal array into Go struct field ... content of type string".
+  #
+  # Pull commands (run on Windows host):
+  #   ollama pull qwen2.5-coder:7b      # fast, daily tasks (already have)
+  #   ollama pull qwen2.5-coder:14b     # balanced quality/speed
+  #   ollama pull qwen2.5-coder:32b     # best pure coding quality
+  #   ollama pull devstral              # agentic coding, multi-file (best for Claude Code)
+  #   ollama pull qwen3:14b             # newer gen, thinking mode
+  #   ollama pull qwen3:32b             # best reasoning + coding (recommended top pick)
+  #   ollama pull gpt-oss:20b           # OpenAI open-weights, variety
+  #   ollama pull phi4:14b              # Microsoft, strong at logic/code for size
+  #   ollama pull mistral-small:22b     # fast, good instruction following
+
+  # --- qwen2.5-coder family --------------------------------------------------
   - model_name: qwen2.5-coder
     litellm_params:
       model: ollama/qwen2.5-coder:7b
       api_base: http://host.docker.internal:11434
 
-  - model_name: qwen2.5-coder-large
+  - model_name: qwen2.5-coder:14b
+    litellm_params:
+      model: ollama/qwen2.5-coder:14b
+      api_base: http://host.docker.internal:11434
+
+  - model_name: qwen2.5-coder:32b
     litellm_params:
       model: ollama/qwen2.5-coder:32b
       api_base: http://host.docker.internal:11434
 
-  - model_name: nemotron-nano
+  # --- qwen3 family (thinking mode supported) --------------------------------
+  - model_name: qwen3:14b
     litellm_params:
-      model: ollama/nemotron3:nano-instruct
+      model: ollama/qwen3:14b
       api_base: http://host.docker.internal:11434
 
+  - model_name: qwen3:32b
+    litellm_params:
+      model: ollama/qwen3:32b
+      api_base: http://host.docker.internal:11434
+
+  # --- Mistral coding agents -------------------------------------------------
+  - model_name: devstral
+    litellm_params:
+      model: ollama/devstral
+      api_base: http://host.docker.internal:11434
+
+  # --- OpenAI open-weights ---------------------------------------------------
   - model_name: gpt-oss
     litellm_params:
       model: ollama/gpt-oss:20b
+      api_base: http://host.docker.internal:11434
+
+  # --- Microsoft Phi ---------------------------------------------------------
+  - model_name: phi4:14b
+    litellm_params:
+      model: ollama/phi4:14b
+      api_base: http://host.docker.internal:11434
+
+  # --- Mistral general -------------------------------------------------------
+  - model_name: mistral-small
+    litellm_params:
+      model: ollama/mistral-small:22b
+      api_base: http://host.docker.internal:11434
+
+  # --- Legacy / kept for compatibility ---------------------------------------
+  - model_name: nemotron-nano
+    litellm_params:
+      model: ollama/nemotron3:nano-instruct
       api_base: http://host.docker.internal:11434
 
   # --- LM Studio (Windows host) ----------------------------------------------
