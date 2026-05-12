@@ -1,0 +1,30 @@
+# Local (qwen2.5-coder ฟรี)
+powershell -ExecutionPolicy Bypass -File "C:\Edge\edgeexpert\EdgeExpert\scripts\win-claude-local.ps1"
+
+# Direct Anthropic API
+powershell -ExecutionPolicy Bypass -File "C:\Edge\edgeexpert\EdgeExpert\scripts\win-claude-local.ps1" -Direct
+
+
+
+Write a Go program in main.go that reads two integers a and b from stdin and prints a+b. Then run it to verify, commit, and push.
+
+
+ollama pull devstral
+ollama pull qwen2.5-coder:14b
+
+
+# devstral
+powershell -ExecutionPolicy Bypass -File "...\win-claude-local.ps1" -Model devstral
+
+# qwen2.5-coder:14b
+powershell -ExecutionPolicy Bypass -File "...\win-claude-local.ps1" -Model qwen2.5-coder:14b
+
+
+
+
+ollama pull devstral          # agentic coding ดีสุด
+ollama pull qwen3:32b         # reasoning + coding ดีสุด  
+ollama pull qwen2.5-coder:32b # pure coding quality
+ollama pull qwen3:14b         # เร็วกว่า 32b ยังดีมาก
+ollama pull gpt-oss:20b       # variety
+ollama pull phi4:14b          # เบา+แรง สำรอง

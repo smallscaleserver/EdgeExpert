@@ -1,0 +1,21 @@
+powershell -ExecutionPolicy Bypass -File "C:\Edge\edgeexpert\EdgeExpert\scripts\win-tune-ollama.ps1" -Upgrade
+
+
+
+
+{
+  "command": "# Load a model and check if GPU is being used\n$body = @{\n    model = \"qwen2.5-coder:7b\"\n    prompt = \"hi\"\n    stream = $false\n} | ConvertTo-Json\n\nInvoke-RestMethod http://localhost:11434/api/generate -Method Post -Body $body -ContentType \"application/json\" -TimeoutSec 60 | Out-Null\n\n# Check ps for VRAM usage\n$r = Invoke-RestMethod http://localhost:11434/api/ps\n$r.models | ForEach-Object {\n    \"Model: $($_.name)\"\n    \"  size_vram:      $([math]::Round($_.size_vram/1MB,0)) MB  $(if($_.size_vram -gt 0){'<-- GPU ACTIVE'}else{'<-- CPU only'})\"\n    \"  size_total:     $([math]::Round($_.size/1MB,0)) MB\"\n    \"  context_length: $($_.context_length)\"\n}",
+  "timeout": 90000,
+  "description": "Load model and verify GPU usage"
+}
+
+
+
+# ใช้ devstral พร้อม 32k context
+powershell -ExecutionPolicy Bypass -File "C:\Edge\edgeexpert\EdgeExpert\scripts\win-claude-local.ps1" -Model devstral-32k
+
+# หรือ qwen2.5-coder
+powershell -ExecutionPolicy Bypass -File "C:\Edge\edgeexpert\EdgeExpert\scripts\win-claude-local.ps1" -Model qwen2.5-coder-32k
+
+
+powershell -ExecutionPolicy Bypass -File "C:\Edge\edgeexpert\EdgeExpert\scripts\win-claude-local.ps1" -Model devstral-32k

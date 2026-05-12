@@ -1,0 +1,17 @@
+# วิธีที่ 1: ถ้ามี make
+cd C:\Edge\edgeexpert\EdgeExpert
+make win-claude-direct
+
+# วิธีที่ 2: เรียก script ตรงๆ (ทำงานได้เสมอ)
+powershell -ExecutionPolicy Bypass -File "C:\Edge\edgeexpert\EdgeExpert\scripts\win-claude-local.ps1" -Direct
+
+# วิธีที่ 3: ระบุ model เอง
+powershell -ExecutionPolicy Bypass -File "C:\Edge\edgeexpert\EdgeExpert\scripts\win-claude-local.ps1" -Direct -Model claude-opus-4-7
+
+
+# Local (qwen2.5-coder ฟรี ไม่ใช้ API)
+powershell -ExecutionPolicy Bypass -File "C:\Edge\edgeexpert\EdgeExpert\scripts\win-claude-local.ps1"
+powershell -ExecutionPolicy Bypass -File "C:\Edge\edgeexpert\EdgeExpert\scripts\win-claude-local.ps1"
+
+# Direct Anthropic (Pro subscription)
+powershell -ExecutionPolicy Bypass -File "C:\Edge\edgeexpert\EdgeExpert\scripts\win-claude-local.ps1" -Direct

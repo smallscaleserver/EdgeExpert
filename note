@@ -54,3 +54,25 @@
   takeown /F "C:\Program Files\Docker\cli-plugins\docker-sandbox.exe"
   icacls "C:\Program Files\Docker\cli-plugins\docker-sandbox.exe" /grant Administrators:F
   ren "C:\Program Files\Docker\cli-plugins\docker-sandbox.exe" "docker-sandbox.exe.disabled"
+
+
+docker compose -f C:\Edge\edgeexpert\EdgeExpert\docker-compose.windows.yml --env-file C:\Edge\edgeexpert\EdgeExpert\.env.windows --env-file C:\Edge\edgeexpert\EdgeExpert\.env.versions --profile cloud up -d --force-recreate litellm
+
+powershell -ExecutionPolicy Bypass -File C:\Edge\edgeexpert\EdgeExpert\scripts\win-claude-local.ps1
+
+cd C:\Edge\edgeexpert\EdgeExpert
+
+docker compose -f docker-compose.windows.yml --env-file .env.windows --env-file .env.versions --profile cloud up -d --force-recreate litellm
+
+Invoke-RestMethod http://localhost:4000/health/liveliness
+
+powershell -ExecutionPolicy Bypass -File C:\Edge\edgeexpert\EdgeExpert\scripts\win-claude-local.ps1
+
+
+cd C:\Edge\edgeexpert\EdgeExpert
+docker compose -f docker-compose.windows.yml --env-file .env.windows --env-file .env.versions --profile cloud up -d --force-recreate litellm
+
+
+powershell -ExecutionPolicy Bypass -File C:\Edge\edgeexpert\EdgeExpert\scripts\win-claude-local.ps1
+
+powershell -ExecutionPolicy Bypass -File C:\Edge\edgeexpert\EdgeExpert\scripts\win-claude-local.ps1 -Direct

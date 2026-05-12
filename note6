@@ -1,0 +1,20 @@
+{
+  "command": "cd C:\\Edge\\edgeexpert\\EdgeExpert; git status --short",
+  "description": "Check uncommitted changes"
+}
+
+
+cd C:\Edge\edgeexpert\EdgeExpert   # เข้า folder repo
+
+git add <ชื่อไฟล์>                 # เลือกไฟล์ที่จะ commit
+git commit -m "สรุปสั้นๆ ว่าแก้อะไร"
+git push                           # push ขึ้น GitHub
+
+
+git add litellm/config.windows.yaml
+git commit -m "fix: เพิ่ม model ใหม่"
+git push
+
+
+git status    # ดูไฟล์ที่เปลี่ยน
+git log --oneline -5   # ดู commit ล่าสุด
