@@ -24,7 +24,7 @@ Models are stored directly on Windows at `%OLLAMA_MODELS%` (default: `%USERPROFI
 
 | Machine | GPU | Notes |
 |---|---|---|
-| HP EliteBook (Intel Arc 140T) | Intel Arc (shared RAM) | GPU_DRIVER not needed — Ollama.exe detects Arc automatically |
+| HP EliteBook (Intel Arc 140T) | Intel Arc (shared RAM) | Requires `OLLAMA_VULKAN=1` — run `win-tune-ollama.ps1` once to configure automatically |
 | Any Windows 11 laptop/desktop | NVIDIA | Ollama.exe uses CUDA automatically |
 | Any Windows machine | CPU only | Slower but works without a GPU |
 
@@ -150,7 +150,7 @@ Recommended models for this machine (HP EliteBook, 64 GB RAM, Intel Arc 140T):
 | `llama3.2:3b` | ~2 GB | General chat, very fast |
 | `qwen2.5-coder:32b` | ~20 GB | Best quality, fits in 64 GB RAM |
 
-> **Intel Arc 140T note**: Ollama uses Intel Arc GPU automatically via SYCL. The Arc 140T shares up to 32 GB of system RAM as VRAM, so models up to ~20 GB run on GPU. Larger models fall back to CPU.
+> **Intel Arc 140T GPU note**: Ollama uses Intel Arc GPU via **Vulkan**. Vulkan support is experimental and **off by default** — you must set `OLLAMA_VULKAN=1` once (the `win-tune-ollama.ps1` script does this automatically). The Arc 140T exposes up to **36 GB** of shared system RAM as Vulkan VRAM, so models up to ~20 GB run entirely on GPU. Verify with `ollama ps` — the `PROCESSOR` column should show `100% GPU`.
 
 ---
 
@@ -212,9 +212,39 @@ ollama rm <model-name>
 - Docker Desktop → Settings → Resources → File Sharing — add the drive
 - Use forward slashes in `.env.windows`: `C:/ai-data` not `C:\ai-data`
 
-### Intel Arc GPU not being used by Ollama
-- Update Intel Arc driver to 31.0.101.x or later
-- Verify: open Task Manager → Performance → GPU 1 (Arc) — usage should spike during inference
+### Intel Arc GPU not being used by Ollama (shows "100% CPU" in `ollama ps`)
+
+Ollama's Vulkan backend is **experimental and disabled by default**. Fix:
+
+**Step 1 — Enable Vulkan and register the ICD (run once):**
+```powershell
+# Run the tuning script — it handles everything automatically:
+powershell -ExecutionPolicy Bypass -File scripts\win-tune-ollama.ps1
+```
+
+Or manually:
+```powershell
+# 1. Enable Vulkan GPU backend
+[System.Environment]::SetEnvironmentVariable("OLLAMA_VULKAN", "1", "User")
+
+# 2. Find and register the Intel Arc Vulkan ICD
+$icd = Get-ChildItem "C:\Windows\System32\DriverStore\FileRepository" -Filter "igvk64.json" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
+[System.Environment]::SetEnvironmentVariable("VK_ICD_FILENAMES", $icd, "User")
+New-Item "HKCU:\SOFTWARE\Khronos\Vulkan\Drivers" -Force | Out-Null
+New-ItemProperty "HKCU:\SOFTWARE\Khronos\Vulkan\Drivers" -Name $icd -Value 0 -PropertyType DWORD -Force | Out-Null
+```
+
+**Step 2 — Restart Ollama** (right-click tray icon → Quit, then relaunch from Start menu)
+
+**Step 3 — Verify:**
+```powershell
+ollama ps
+# PROCESSOR column should show: 100% GPU
+```
+
+**Why this happens**: Intel Arc registers its Vulkan ICD via the Windows display-adapter registry path, not the traditional `HKLM\SOFTWARE\Khronos\Vulkan\Drivers` key that Ollama's bundled Vulkan loader reads. The fix above registers it in the user-level Khronos key and sets `VK_ICD_FILENAMES` as a fallback.
+
+**Intel Arc driver requirement**: 31.0.101.x or later (driver 32.0.101.8508 confirmed working).
 
 ### Port 3000 already in use
 - Change `WEBUI_PORT=3001` in `.env.windows`

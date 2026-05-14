@@ -114,7 +114,13 @@ cd EdgeExpert
 Copy-Item .env.windows.example .env.windows   # edit AI_DATA_ROOT and WEBUI_SECRET_KEY
 make win-up                                    # starts Open WebUI at http://localhost:3000
 ollama pull qwen2.5-coder:7b                   # pull a model
+
+# Intel Arc GPU — enable Vulkan acceleration (one-time, then restart Ollama):
+powershell -ExecutionPolicy Bypass -File scripts\win-tune-ollama.ps1
+# After restarting Ollama: ollama ps → PROCESSOR column shows "100% GPU"
 ```
+
+> **Intel Arc GPU**: Ollama's Vulkan backend is **off by default**. Run `win-tune-ollama.ps1` once to set `OLLAMA_VULKAN=1` and register the Intel ICD. Then restart Ollama. Models up to ~20 GB run at 100% GPU on Arc 140T (36 GB Vulkan VRAM from shared RAM).
 
 Full guide: [`docs/WINDOWS-SETUP.md`](./docs/WINDOWS-SETUP.md)
 
@@ -171,7 +177,7 @@ LiteLLM proxy  (Docker container, port 4000)
 Ollama.exe     (Windows host, port 11434)
         │
         ▼
-Intel Arc 140T GPU  ←  up to 32 GB shared VRAM from 64 GB RAM
+Intel Arc 140T GPU  ←  36 GB Vulkan VRAM (shared from 64 GB RAM, requires OLLAMA_VULKAN=1)
 
 Open WebUI  (Docker container, port 3000)  ←  browser UI, same models
 ```

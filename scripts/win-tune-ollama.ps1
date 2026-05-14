@@ -8,8 +8,8 @@
 # Context length cannot be set globally via env var - must be in a Modelfile
 # or passed per-request via {"options": {"num_ctx": 32768}}.
 #
-# Intel Arc GPU: not supported in standard Ollama Windows build (CUDA/ROCm only).
-# CPU-only with flash attention + 16 threads is the practical max here.
+# Intel Arc GPU: supported via Vulkan (OLLAMA_VULKAN=1).
+# This script sets the required env vars so Ollama uses the Arc GPU automatically.
 #
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File scripts\win-tune-ollama.ps1
@@ -49,6 +49,7 @@ $persistVars = @{
     OLLAMA_NUM_PARALLEL      = "1"    # one request at a time, all 8 threads to it
     OLLAMA_MAX_LOADED_MODELS = "1"    # one model resident, no thrashing
     OLLAMA_KEEP_ALIVE        = "60m"  # keep model warm 60 min
+    OLLAMA_VULKAN            = "1"    # enable Vulkan GPU backend (Intel Arc on Windows)
 }
 
 Write-Host "  Persisting env vars..." -ForegroundColor Yellow
@@ -56,6 +57,28 @@ foreach ($key in $persistVars.Keys) {
     [System.Environment]::SetEnvironmentVariable($key, $persistVars[$key], 'User')
     [System.Environment]::SetEnvironmentVariable($key, $persistVars[$key], 'Process')
     Write-Host "  $key = $($persistVars[$key])" -ForegroundColor Green
+}
+
+# --- Step 1b: register Intel Arc Vulkan ICD (needed by Ollama's Vulkan loader) ----
+# Intel Arc driver stores its ICD via the display-adapter registry path, not the
+# traditional Khronos key. Ollama's bundled Vulkan loader reads the Khronos key,
+# so we register it here explicitly. Safe to run on non-Intel machines (no-op if
+# the ICD file doesn't exist).
+$_intelIcdRegKey = "HKCU:\SOFTWARE\Khronos\Vulkan\Drivers"
+$_intelIcdCandidates = @(
+    # Search DriverStore for Intel Arc ICD (path varies with driver version)
+    (Get-ChildItem "C:\Windows\System32\DriverStore\FileRepository" -Filter "igvk64.json" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName)
+)
+$_intelIcd = $_intelIcdCandidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+if ($_intelIcd) {
+    [System.Environment]::SetEnvironmentVariable("VK_ICD_FILENAMES", $_intelIcd, "User")
+    [System.Environment]::SetEnvironmentVariable("VK_ICD_FILENAMES", $_intelIcd, "Process")
+    New-Item -Path $_intelIcdRegKey -Force -ErrorAction SilentlyContinue | Out-Null
+    New-ItemProperty -Path $_intelIcdRegKey -Name $_intelIcd -Value 0 -PropertyType DWORD -Force -ErrorAction SilentlyContinue | Out-Null
+    Write-Host "  VK_ICD_FILENAMES = $_intelIcd" -ForegroundColor Green
+    Write-Host "  Registered Intel Arc Vulkan ICD in HKCU registry" -ForegroundColor Green
+} else {
+    Write-Host "  Intel Arc Vulkan ICD not found (non-Intel machine, skipping)" -ForegroundColor DarkGray
 }
 
 # --- Step 2: restart ollama serve with vars injected -----------------------

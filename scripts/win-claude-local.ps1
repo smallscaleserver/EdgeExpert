@@ -8,6 +8,13 @@
 #   make win-cloud     (starts LiteLLM + Open WebUI)
 #   ollama pull qwen2.5-coder:7b
 #
+# GPU acceleration (Intel Arc 140T):
+#   Ollama uses Vulkan for Intel Arc GPU on Windows.
+#   OLLAMA_VULKAN=1 and VK_ICD_FILENAMES are set persistently in the user
+#   environment by this script if not already configured.
+#   The script will warn and optionally restart Ollama if a model is running
+#   on CPU when GPU is available.
+#
 # Usage (from any git repo):
 #   cd C:\your\repo
 #
@@ -50,6 +57,56 @@ if (Test-Path $envFile) {
 }
 
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+
+# ==========================================================================
+# Intel Arc GPU — ensure Vulkan acceleration is configured for Ollama
+# ==========================================================================
+# OLLAMA_VULKAN=1 enables experimental Vulkan GPU support (off by default).
+# VK_ICD_FILENAMES tells the Vulkan loader where the Intel Arc ICD lives
+# (needed because Intel Arc registers its ICD via the display-adapter
+# registry path, which older Vulkan loaders don't scan).
+$_intelVulkanIcd = "C:\Windows\System32\DriverStore\FileRepository\iigd_dch.inf_amd64_76787e203cb9b607\igvk64.json"
+
+function _EnsureGpuEnv {
+    $changed = $false
+    if ([System.Environment]::GetEnvironmentVariable("OLLAMA_VULKAN", "User") -ne "1") {
+        [System.Environment]::SetEnvironmentVariable("OLLAMA_VULKAN", "1", "User")
+        Write-Host "  [GPU] Set OLLAMA_VULKAN=1 (user env)" -ForegroundColor DarkGray
+        $changed = $true
+    }
+    if ((Test-Path $_intelVulkanIcd) -and ([System.Environment]::GetEnvironmentVariable("VK_ICD_FILENAMES", "User") -ne $_intelVulkanIcd)) {
+        [System.Environment]::SetEnvironmentVariable("VK_ICD_FILENAMES", $_intelVulkanIcd, "User")
+        # Also register in HKCU so all Vulkan loaders find the ICD
+        $regKey = "HKCU:\SOFTWARE\Khronos\Vulkan\Drivers"
+        New-Item -Path $regKey -Force -ErrorAction SilentlyContinue | Out-Null
+        New-ItemProperty -Path $regKey -Name $_intelVulkanIcd -Value 0 -PropertyType DWORD -Force -ErrorAction SilentlyContinue | Out-Null
+        Write-Host "  [GPU] Set VK_ICD_FILENAMES (user env + HKCU registry)" -ForegroundColor DarkGray
+        $changed = $true
+    }
+    # Apply to current process so child processes inherit
+    $env:OLLAMA_VULKAN    = "1"
+    $env:VK_ICD_FILENAMES = $_intelVulkanIcd
+    return $changed
+}
+
+function _CheckOllamaGpu {
+    try {
+        $ps = ollama ps 2>$null
+        if ($ps -match "100% CPU") {
+            Write-Host ""
+            Write-Host "  [GPU] WARNING: Ollama model is running on CPU, not GPU." -ForegroundColor Yellow
+            Write-Host "  [GPU] Restart Ollama (tray icon -> Quit, then relaunch) to apply GPU settings." -ForegroundColor Yellow
+            Write-Host "  [GPU] After restarting, run this script again." -ForegroundColor Yellow
+        } elseif ($ps -match "GPU") {
+            Write-Host "  [GPU] Ollama is using GPU acceleration." -ForegroundColor Green
+        }
+    } catch {}
+}
+
+$_gpuChanged = _EnsureGpuEnv
+if ($_gpuChanged) {
+    Write-Host "  [GPU] Intel Arc Vulkan settings applied. Restart Ollama if it was already running." -ForegroundColor Yellow
+}
 
 # ==========================================================================
 # DIRECT mode — real Anthropic API (login session or API key)
@@ -98,6 +155,8 @@ Write-Host "  Claude Code -> LiteLLM ($LiteLLMUrl) -> Ollama (local)" -Foregroun
 Write-Host "  Model: $Model" -ForegroundColor Cyan
 Write-Host "  Press Ctrl+C to exit" -ForegroundColor DarkGray
 Write-Host ""
+
+_CheckOllamaGpu
 
 $env:ANTHROPIC_BASE_URL = $LiteLLMUrl
 $env:ANTHROPIC_API_KEY  = $ApiKey
