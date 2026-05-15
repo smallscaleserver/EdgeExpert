@@ -57,6 +57,15 @@ model_list:
       api_base: http://host.docker.internal:11434/v1
       api_key: ollama
 
+  # qwen2.5-coder-cpu: CPU-only, 8k context. Stable for Claude Code tool-use.
+  # Ollama Vulkan runner (0.23.4) crashes on long prompts (>~800 tokens).
+  # CPU is slower (~6 tok/s) but never crashes. Use until Vulkan runner is stable.
+  - model_name: qwen2.5-coder-cpu
+    litellm_params:
+      model: openai/qwen2.5-coder-cpu
+      api_base: http://host.docker.internal:11434/v1
+      api_key: ollama
+
   # qwen2.5-coder-8k: 8k context, ~5 GB VRAM — stable for Claude Code tool-use on Vulkan.
   - model_name: qwen2.5-coder-8k
     litellm_params:
