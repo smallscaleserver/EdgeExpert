@@ -32,7 +32,7 @@
 # =============================================================================
 
 param(
-    [string]$Model      = "",           # default depends on mode: claude-sonnet-4-6 (direct) or qwen2.5-coder (local)
+    [string]$Model      = "",           # default depends on mode: claude-sonnet-4-6 (direct) or qwen2.5-coder-partial (local)
     [string]$LiteLLMUrl = "http://localhost:4000",
     [string]$ApiKey     = "sk-local",
     [switch]$Direct     # bypass LiteLLM - use real Anthropic API directly
@@ -40,7 +40,9 @@ param(
 
 # Set model default based on mode if not explicitly provided
 if ($Model -eq "") {
-    $Model = if ($Direct) { "claude-sonnet-4-6" } else { "qwen2.5-coder" }
+    # qwen2.5-coder-partial: 70% GPU / 30% CPU hybrid — stable for long prompts.
+    # LiteLLM fallback auto-switches to qwen2.5-coder-cpu if the model fails.
+    $Model = if ($Direct) { "claude-sonnet-4-6" } else { "qwen2.5-coder-partial" }
 }
 
 # Read overrides from .env.windows if present

@@ -56,15 +56,29 @@ model_list:
       model: openai/qwen2.5-coder:7b
       api_base: http://host.docker.internal:11434/v1
       api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
 
-  # qwen2.5-coder-cpu: CPU-only, 8k context. Stable for Claude Code tool-use.
-  # Ollama Vulkan runner (0.23.4) crashes on long prompts (>~800 tokens).
-  # CPU is slower (~6 tok/s) but never crashes. Use until Vulkan runner is stable.
+  # qwen2.5-coder-partial: 20/28 layers on GPU (70% GPU / 30% CPU).
+  # Ollama 0.23.4 full-GPU Vulkan runner crashes on long prompts (>~800 tokens).
+  # Partial offload avoids the crash while keeping GPU acceleration (~5 tok/s).
+  # Automatic fallback → qwen2.5-coder-cpu via router_settings below.
+  - model_name: qwen2.5-coder-partial
+    litellm_params:
+      model: openai/qwen2.5-coder-partial
+      api_base: http://host.docker.internal:11434/v1
+      api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
+
+  # qwen2.5-coder-cpu: CPU-only fallback (~4 tok/s). Never crashes, any prompt length.
   - model_name: qwen2.5-coder-cpu
     litellm_params:
       model: openai/qwen2.5-coder-cpu
       api_base: http://host.docker.internal:11434/v1
       api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
 
   # qwen2.5-coder-8k: 8k context, ~5 GB VRAM — stable for Claude Code tool-use on Vulkan.
   - model_name: qwen2.5-coder-8k
@@ -72,24 +86,32 @@ model_list:
       model: openai/qwen2.5-coder-8k
       api_base: http://host.docker.internal:11434/v1
       api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
 
   - model_name: qwen2.5-coder-32k
     litellm_params:
       model: openai/qwen2.5-coder-32k
       api_base: http://host.docker.internal:11434/v1
       api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
 
   - model_name: qwen2.5-coder:14b
     litellm_params:
       model: openai/qwen2.5-coder:14b
       api_base: http://host.docker.internal:11434/v1
       api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
 
   - model_name: qwen2.5-coder:32b
     litellm_params:
       model: openai/qwen2.5-coder:32b
       api_base: http://host.docker.internal:11434/v1
       api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
 
   # --- qwen3 family (thinking mode supported) --------------------------------
   - model_name: qwen3:14b
@@ -97,12 +119,16 @@ model_list:
       model: openai/qwen3:14b
       api_base: http://host.docker.internal:11434/v1
       api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
 
   - model_name: qwen3:32b
     litellm_params:
       model: openai/qwen3:32b
       api_base: http://host.docker.internal:11434/v1
       api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
 
   # --- Mistral coding agents -------------------------------------------------
   - model_name: devstral
@@ -110,6 +136,8 @@ model_list:
       model: openai/devstral
       api_base: http://host.docker.internal:11434/v1
       api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
 
   # devstral-32k: large context for deep multi-file tasks.
   # Note: 21 GB VRAM on Vulkan — if the runner crashes, use devstral-8k.
@@ -118,6 +146,8 @@ model_list:
       model: openai/devstral-32k
       api_base: http://host.docker.internal:11434/v1
       api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
 
   # devstral-8k: 8k context, ~15 GB VRAM — stable for Claude Code tool-use.
   - model_name: devstral-8k
@@ -125,6 +155,8 @@ model_list:
       model: openai/devstral-8k
       api_base: http://host.docker.internal:11434/v1
       api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
 
   # --- OpenAI open-weights ---------------------------------------------------
   - model_name: gpt-oss
@@ -132,6 +164,8 @@ model_list:
       model: openai/gpt-oss:20b
       api_base: http://host.docker.internal:11434/v1
       api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
 
   # --- Microsoft Phi ---------------------------------------------------------
   - model_name: phi4:14b
@@ -139,6 +173,8 @@ model_list:
       model: openai/phi4:14b
       api_base: http://host.docker.internal:11434/v1
       api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
 
   # --- Mistral general -------------------------------------------------------
   - model_name: mistral-small
@@ -146,6 +182,8 @@ model_list:
       model: openai/mistral-small:22b
       api_base: http://host.docker.internal:11434/v1
       api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
 
   # --- Legacy / kept for compatibility ---------------------------------------
   - model_name: nemotron-nano
@@ -153,6 +191,8 @@ model_list:
       model: openai/nemotron3:nano-instruct
       api_base: http://host.docker.internal:11434/v1
       api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
 
   # --- LM Studio (Windows host) ----------------------------------------------
   - model_name: lmstudio
@@ -181,6 +221,15 @@ litellm_settings:
   # 6 hours - user is willing to wait, machine runs slow but finishes.
   request_timeout: 21600    # 6 hours
   stream_timeout: 21600     # 6 hours
+
+router_settings:
+  # If qwen2.5-coder-partial (partial GPU) fails with a 500 (Vulkan crash),
+  # automatically retry with qwen2.5-coder-cpu (CPU-only, always stable).
+  fallbacks:
+    - qwen2.5-coder-partial:
+        - qwen2.5-coder-cpu
+  num_retries: 1
+  retry_after: 0
 
 general_settings:
   max_request_timeout: 21600  # 6 hours

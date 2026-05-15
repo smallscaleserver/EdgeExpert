@@ -246,6 +246,41 @@ ollama ps
 
 **Intel Arc driver requirement**: 31.0.101.x or later (driver 32.0.101.8508 confirmed working).
 
+### Claude Code tool-use fails with local model (`model runner has unexpectedly stopped` or no file changes)
+
+Two bugs in **Ollama ≤ 0.23.4** break Claude Code tool-use:
+
+| Bug | Symptom | Root cause |
+|---|---|---|
+| Vulkan runner crash | `model runner has unexpectedly stopped` on every request | Experimental Vulkan backend OOMs / segfaults on long prompts (>800 tokens). Claude Code system prompt + tool defs = ~3000–5000 tokens. |
+| Tool call format | Claude Code responds with text suggestions but makes no file changes | Ollama 0.23.4 does not convert Qwen's `<tool_call>` tags to OpenAI `tool_calls` JSON. Claude Code ignores text-format tool calls. |
+
+**Fix: Upgrade Ollama.**
+
+```powershell
+# 1. Download latest Ollama installer for Windows from:
+#    https://ollama.com/download/windows
+#    then run the installer (it upgrades in-place, models are preserved)
+
+# 2. After upgrade, verify version:
+ollama --version   # should be > 0.23.4
+
+# 3. Re-run GPU setup (in case the update reset env vars):
+powershell -ExecutionPolicy Bypass -File "C:\Edge\edgeexpert\EdgeExpert\scripts\win-tune-ollama.ps1"
+```
+
+**While waiting to upgrade** (workaround using partial GPU + CPU fallback):
+```powershell
+# qwen2.5-coder-partial: 70% GPU, ~5 tok/s — stable for short prompts
+# Automatic fallback to qwen2.5-coder-cpu if the GPU runner crashes
+powershell -ExecutionPolicy Bypass -File "C:\Edge\edgeexpert\EdgeExpert\scripts\win-claude-local.ps1" -Model qwen2.5-coder-partial
+```
+Note: the workaround prevents the crash but tool calls may still return as text (no file edits) until Ollama is upgraded. The model will give you instructions you can run manually.
+
+### LiteLLM returns `KeyError: 'arguments'` for local models
+
+This is a bug in **LiteLLM 1.44.2**'s Ollama handler (`ollama.py:473`). Fixed in `litellm/config.windows.yaml` by using `openai/<model>` + `api_base: .../v1` instead of `ollama/<model>`. No action needed if using this repo's config.
+
 ### Port 3000 already in use
 - Change `WEBUI_PORT=3001` in `.env.windows`
 
