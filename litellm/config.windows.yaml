@@ -6,6 +6,27 @@
 # docker-compose.windows.yml).
 #
 # Used by: docker-compose.windows.yml → litellm service
+#
+# LOCAL MODEL PROVIDER: openai/ pointing at Ollama's /v1 endpoint
+# ---------------------------------------------------------------
+# We use `openai/<model>` + api_base=.../v1 instead of `ollama/<model>`.
+# Ollama exposes a full OpenAI-compatible /v1/chat/completions endpoint.
+# LiteLLM's OpenAI handler is far more stable than its custom Ollama handler:
+#   - No KeyError: 'arguments' when parsing tool-call responses (LiteLLM bug)
+#   - No crash when content is an array (Claude Code sends arrays for multi-turn)
+#   - Handles streaming, tool-use, and multi-turn correctly
+# api_key can be any non-empty string — Ollama ignores it.
+#
+# Pull commands (run on Windows host):
+#   ollama pull qwen2.5-coder:7b      # fast, daily tasks
+#   ollama pull qwen2.5-coder:14b     # balanced quality/speed
+#   ollama pull qwen2.5-coder:32b     # best pure coding quality
+#   ollama pull devstral              # agentic coding, multi-file
+#   ollama pull qwen3:14b             # newer gen, thinking mode
+#   ollama pull qwen3:32b             # best reasoning + coding
+#   ollama pull gpt-oss:20b           # OpenAI open-weights
+#   ollama pull phi4:14b              # Microsoft, strong logic/code
+#   ollama pull mistral-small:22b     # fast, good instruction following
 # =============================================================================
 
 model_list:
@@ -25,91 +46,97 @@ model_list:
       model: anthropic/claude-haiku-4-5-20251001
       api_key: os.environ/ANTHROPIC_API_KEY
 
-  # --- Local Ollama (Windows host) -------------------------------------------
-  # api_base points at host.docker.internal because Ollama runs as ollama.exe
-  # on Windows — not as a container on this compose network.
-  #
-  # NOTE: use `ollama/` not `ollama_chat/` — Claude Code sends content as an
-  # array (tool results, multi-turn), which ollama_chat rejects with
-  # "cannot unmarshal array into Go struct field ... content of type string".
-  #
-  # Pull commands (run on Windows host):
-  #   ollama pull qwen2.5-coder:7b      # fast, daily tasks (already have)
-  #   ollama pull qwen2.5-coder:14b     # balanced quality/speed
-  #   ollama pull qwen2.5-coder:32b     # best pure coding quality
-  #   ollama pull devstral              # agentic coding, multi-file (best for Claude Code)
-  #   ollama pull qwen3:14b             # newer gen, thinking mode
-  #   ollama pull qwen3:32b             # best reasoning + coding (recommended top pick)
-  #   ollama pull gpt-oss:20b           # OpenAI open-weights, variety
-  #   ollama pull phi4:14b              # Microsoft, strong at logic/code for size
-  #   ollama pull mistral-small:22b     # fast, good instruction following
+  # --- Local Ollama via OpenAI-compatible /v1 endpoint -----------------------
+  # All local models use openai/ provider pointing at Ollama's /v1 endpoint.
+  # This avoids LiteLLM's buggy ollama-specific handler (tool-call parsing).
 
   # --- qwen2.5-coder family --------------------------------------------------
   - model_name: qwen2.5-coder
     litellm_params:
-      model: ollama/qwen2.5-coder:7b
-      api_base: http://host.docker.internal:11434
+      model: openai/qwen2.5-coder:7b
+      api_base: http://host.docker.internal:11434/v1
+      api_key: ollama
 
   - model_name: qwen2.5-coder-32k
     litellm_params:
-      model: ollama/qwen2.5-coder-32k
-      api_base: http://host.docker.internal:11434
+      model: openai/qwen2.5-coder-32k
+      api_base: http://host.docker.internal:11434/v1
+      api_key: ollama
 
   - model_name: qwen2.5-coder:14b
     litellm_params:
-      model: ollama/qwen2.5-coder:14b
-      api_base: http://host.docker.internal:11434
+      model: openai/qwen2.5-coder:14b
+      api_base: http://host.docker.internal:11434/v1
+      api_key: ollama
 
   - model_name: qwen2.5-coder:32b
     litellm_params:
-      model: ollama/qwen2.5-coder:32b
-      api_base: http://host.docker.internal:11434
+      model: openai/qwen2.5-coder:32b
+      api_base: http://host.docker.internal:11434/v1
+      api_key: ollama
 
   # --- qwen3 family (thinking mode supported) --------------------------------
   - model_name: qwen3:14b
     litellm_params:
-      model: ollama/qwen3:14b
-      api_base: http://host.docker.internal:11434
+      model: openai/qwen3:14b
+      api_base: http://host.docker.internal:11434/v1
+      api_key: ollama
 
   - model_name: qwen3:32b
     litellm_params:
-      model: ollama/qwen3:32b
-      api_base: http://host.docker.internal:11434
+      model: openai/qwen3:32b
+      api_base: http://host.docker.internal:11434/v1
+      api_key: ollama
 
   # --- Mistral coding agents -------------------------------------------------
   - model_name: devstral
     litellm_params:
-      model: ollama/devstral
-      api_base: http://host.docker.internal:11434
+      model: openai/devstral
+      api_base: http://host.docker.internal:11434/v1
+      api_key: ollama
 
+  # devstral-32k: large context for deep multi-file tasks.
+  # Note: 21 GB VRAM on Vulkan — if the runner crashes, use devstral-8k.
   - model_name: devstral-32k
     litellm_params:
-      model: ollama/devstral-32k
-      api_base: http://host.docker.internal:11434
+      model: openai/devstral-32k
+      api_base: http://host.docker.internal:11434/v1
+      api_key: ollama
+
+  # devstral-8k: 8k context, ~15 GB VRAM — stable for Claude Code tool-use.
+  - model_name: devstral-8k
+    litellm_params:
+      model: openai/devstral-8k
+      api_base: http://host.docker.internal:11434/v1
+      api_key: ollama
 
   # --- OpenAI open-weights ---------------------------------------------------
   - model_name: gpt-oss
     litellm_params:
-      model: ollama/gpt-oss:20b
-      api_base: http://host.docker.internal:11434
+      model: openai/gpt-oss:20b
+      api_base: http://host.docker.internal:11434/v1
+      api_key: ollama
 
   # --- Microsoft Phi ---------------------------------------------------------
   - model_name: phi4:14b
     litellm_params:
-      model: ollama/phi4:14b
-      api_base: http://host.docker.internal:11434
+      model: openai/phi4:14b
+      api_base: http://host.docker.internal:11434/v1
+      api_key: ollama
 
   # --- Mistral general -------------------------------------------------------
   - model_name: mistral-small
     litellm_params:
-      model: ollama/mistral-small:22b
-      api_base: http://host.docker.internal:11434
+      model: openai/mistral-small:22b
+      api_base: http://host.docker.internal:11434/v1
+      api_key: ollama
 
   # --- Legacy / kept for compatibility ---------------------------------------
   - model_name: nemotron-nano
     litellm_params:
-      model: ollama/nemotron3:nano-instruct
-      api_base: http://host.docker.internal:11434
+      model: openai/nemotron3:nano-instruct
+      api_base: http://host.docker.internal:11434/v1
+      api_key: ollama
 
   # --- LM Studio (Windows host) ----------------------------------------------
   - model_name: lmstudio
