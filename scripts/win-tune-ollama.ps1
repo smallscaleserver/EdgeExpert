@@ -22,6 +22,12 @@ param(
 
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 
+# UTF-8 — ป้องกันภาษาไทยแสดงเป็น garbage characters ใน Terminal
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+chcp 65001 | Out-Null
+$env:PYTHONIOENCODING = "utf-8"
+
 $ollamaExe = "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe"
 if (-not (Test-Path $ollamaExe)) {
     Write-Host "[ERROR] Ollama not found at $ollamaExe" -ForegroundColor Red

@@ -60,6 +60,12 @@ if (Test-Path $envFile) {
 
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 
+# UTF-8 — ป้องกันภาษาไทยแสดงเป็น garbage characters ใน Terminal
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+chcp 65001 | Out-Null
+$env:PYTHONIOENCODING = "utf-8"
+
 # ==========================================================================
 # Intel Arc GPU — ensure Vulkan acceleration is configured for Ollama
 # ==========================================================================

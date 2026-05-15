@@ -281,6 +281,33 @@ Note: the workaround prevents the crash but tool calls may still return as text 
 
 This is a bug in **LiteLLM 1.44.2**'s Ollama handler (`ollama.py:473`). Fixed in `litellm/config.windows.yaml` by using `openai/<model>` + `api_base: .../v1` instead of `ollama/<model>`. No action needed if using this repo's config.
 
+### ภาษาไทย / Unicode แสดงเป็น garbage characters ใน Terminal
+
+PowerShell ใช้ encoding ที่ไม่ใช่ UTF-8 โดย default ทำให้ตัวอักษรไทยแสดงเป็น `???` หรือ `â€` แก้ได้สองวิธี:
+
+**วิธีที่ 1 — ถาวร (แนะนำ):** เพิ่มใน PowerShell profile (`$PROFILE`):
+```powershell
+notepad $PROFILE
+# วางเข้าไป:
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+chcp 65001 | Out-Null
+```
+
+**วิธีที่ 2 — เฉพาะ session นี้:**
+```powershell
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+chcp 65001 | Out-Null
+```
+
+ทดสอบ:
+```powershell
+Write-Host "สวัสดีไทย ก ข ค 🇹🇭"
+```
+
+> **หมายเหตุ:** สคริปต์ `win-setup.ps1`, `win-claude-local.ps1`, และ `win-tune-ollama.ps1` ตั้ง UTF-8 อัตโนมัติตอนรัน และ `win-setup.ps1` จะเขียนลง profile ให้ถาวรด้วย
+
 ### Port 3000 already in use
 - Change `WEBUI_PORT=3001` in `.env.windows`
 

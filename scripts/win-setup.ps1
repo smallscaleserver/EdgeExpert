@@ -19,6 +19,12 @@
 
 $ErrorActionPreference = "Stop"
 
+# UTF-8 — ป้องกันภาษาไทยแสดงเป็น garbage characters ใน Terminal
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+chcp 65001 | Out-Null
+$env:PYTHONIOENCODING = "utf-8"
+
 function Write-Step($msg) {
     Write-Host ""
     Write-Host "==> $msg" -ForegroundColor Cyan
@@ -34,6 +40,31 @@ function Write-Warn($msg) {
 
 function Write-Err($msg) {
     Write-Host "    [ERROR] $msg" -ForegroundColor Red
+}
+
+# --- 0a. PowerShell Profile — UTF-8 ถาวร ------------------------------------
+# เขียน UTF-8 encoding ลง $PROFILE เพื่อให้ทุก PowerShell session แสดงไทยถูก
+$profileLines = @(
+    "",
+    "# UTF-8 encoding — ป้องกันภาษาไทยแสดงเป็น garbage (added by win-setup.ps1)",
+    "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8",
+    '$OutputEncoding = [System.Text.Encoding]::UTF8',
+    "chcp 65001 | Out-Null"
+)
+$profilePath = $PROFILE
+$needsUtf8 = $true
+if (Test-Path $profilePath) {
+    $existing = Get-Content $profilePath -Raw -ErrorAction SilentlyContinue
+    if ($existing -match "OutputEncoding.*UTF8") { $needsUtf8 = $false }
+}
+if ($needsUtf8) {
+    if (-not (Test-Path (Split-Path $profilePath))) {
+        New-Item -ItemType Directory -Force (Split-Path $profilePath) | Out-Null
+    }
+    Add-Content -Path $profilePath -Value ($profileLines -join "`n") -Encoding UTF8
+    Write-Host "    [OK] UTF-8 added to PowerShell profile: $profilePath" -ForegroundColor Green
+} else {
+    Write-Host "    [OK] PowerShell profile already has UTF-8 encoding" -ForegroundColor DarkGray
 }
 
 # --- 0. Must be Admin ------------------------------------------------------
