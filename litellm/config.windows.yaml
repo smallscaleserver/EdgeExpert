@@ -57,6 +57,13 @@ model_list:
       api_base: http://host.docker.internal:11434/v1
       api_key: ollama
 
+  # qwen2.5-coder-8k: 8k context, ~5 GB VRAM — stable for Claude Code tool-use on Vulkan.
+  - model_name: qwen2.5-coder-8k
+    litellm_params:
+      model: openai/qwen2.5-coder-8k
+      api_base: http://host.docker.internal:11434/v1
+      api_key: ollama
+
   - model_name: qwen2.5-coder-32k
     litellm_params:
       model: openai/qwen2.5-coder-32k
