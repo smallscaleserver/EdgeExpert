@@ -98,14 +98,20 @@ function _EnsureGpuEnv {
 }
 
 function _CheckOllamaGpu {
+    # Skip GPU check for CPU-only models — they intentionally run on CPU
+    if ($Model -match "-cpu$") { return }
     try {
-        $ps = ollama ps 2>$null
-        if ($ps -match "100% CPU") {
+        $psLines = ollama ps 2>$null
+        # Only act if at least one model row is loaded (more than just the header line)
+        $dataLines = ($psLines -split "`n") | Where-Object { $_ -match "\S" -and $_ -notmatch "^NAME\s" }
+        if (-not $dataLines) { return }
+        $psText = $psLines -join " "
+        if ($psText -match "100% CPU") {
             Write-Host ""
             Write-Host "  [GPU] WARNING: Ollama model is running on CPU, not GPU." -ForegroundColor Yellow
             Write-Host "  [GPU] Restart Ollama (tray icon -> Quit, then relaunch) to apply GPU settings." -ForegroundColor Yellow
             Write-Host "  [GPU] After restarting, run this script again." -ForegroundColor Yellow
-        } elseif ($ps -match "GPU") {
+        } elseif ($psText -match "GPU") {
             Write-Host "  [GPU] Ollama is using GPU acceleration." -ForegroundColor Green
         }
     } catch {}
