@@ -1,0 +1,22 @@
+--- a/litellm/llms/ollama_chat.py
++++ b/litellm/llms/ollama_chat.py
+@@ -248,6 +248,22 @@ def get_ollama_response(
+             m = m.model_dump(exclude_none=True)
++        if isinstance(m.get("content"), list):
++            m = dict(m)
++            parts = []
++            for part in m["content"]:
++                if not isinstance(part, dict):
++                    continue
++                if part.get("type") == "text":
++                    parts.append(part.get("text", ""))
++                elif part.get("type") == "tool_result":
++                    inner = part.get("content", "")
++                    if isinstance(inner, list):
++                        inner = "\n".join(
++                            p.get("text", "") for p in inner
++                            if isinstance(p, dict) and p.get("type") == "text"
++                        )
++                    parts.append(str(inner) if inner else "")
++            m["content"] = "\n".join(parts)
+         if m.get("tool_calls") is not None and isinstance(m["tool_calls"], list):

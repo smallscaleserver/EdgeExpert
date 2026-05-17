@@ -81,6 +81,7 @@ model_list:
       stream_timeout: 21600
 
   # qwen2.5-coder-8k: 8k context, ~5 GB VRAM — stable for Claude Code tool-use on Vulkan.
+  # Uses openai/ provider (Ollama /v1 endpoint) — stable streaming/multi-turn.
   - model_name: qwen2.5-coder-8k
     litellm_params:
       model: openai/qwen2.5-coder-8k
@@ -88,6 +89,30 @@ model_list:
       api_key: ollama
       timeout: 21600
       stream_timeout: 21600
+
+  # qwen2.5-coder-8k-hermes: GPU model via ollama_chat/ + hermes parser.
+  # hermes converts plain {"name":...,"arguments":...} text → proper tool_calls API format.
+  # Note: GPU (Vulkan) crashes on Intel Arc 140T for complex/long inference. Use cpu-hermes instead.
+  - model_name: qwen2.5-coder-8k-hermes
+    litellm_params:
+      model: ollama_chat/qwen2.5-coder-8k
+      api_base: http://host.docker.internal:11434
+      api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
+      tool_call_parser: hermes
+
+  # qwen2.5-coder-cpu-hermes: CPU-only model via ollama_chat/ + hermes parser.
+  # Stable for Claude Code tool-use: no Vulkan crash, hermes converts text → tool_calls.
+  # Slow (~4 tok/s) but never crashes. This is the working local AI coding model for Arc 140T.
+  - model_name: qwen2.5-coder-cpu-hermes
+    litellm_params:
+      model: ollama_chat/qwen2.5-coder-cpu
+      api_base: http://host.docker.internal:11434
+      api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
+      tool_call_parser: hermes
 
   - model_name: qwen2.5-coder-32k
     litellm_params:
@@ -221,6 +246,9 @@ litellm_settings:
   # 6 hours - user is willing to wait, machine runs slow but finishes.
   request_timeout: 21600    # 6 hours
   stream_timeout: 21600     # 6 hours
+  # hermes parser converts plain {"name":...,"arguments":...} text → tool_calls API format.
+  # Needed because Ollama only generates <tool_call> tags on GPU; CPU path outputs raw JSON text.
+  tool_call_parser: hermes
 
 router_settings:
   # If qwen2.5-coder-partial (partial GPU) fails with a 500 (Vulkan crash),
