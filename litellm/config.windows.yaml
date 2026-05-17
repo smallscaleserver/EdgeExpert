@@ -147,6 +147,17 @@ model_list:
       timeout: 21600
       stream_timeout: 21600
 
+  # qwen3:14b-hermes: Claude Code tool-use variant via ollama_chat/ + hermes parser.
+  # 14B model with strong tool-use capability. Requires ollama_chat_array_content.patch applied.
+  - model_name: qwen3:14b-hermes
+    litellm_params:
+      model: ollama_chat/qwen3:14b
+      api_base: http://host.docker.internal:11434
+      api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
+      tool_call_parser: hermes
+
   - model_name: qwen3:32b
     litellm_params:
       model: openai/qwen3:32b
