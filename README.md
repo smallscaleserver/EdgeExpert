@@ -392,6 +392,122 @@ Open WebUI (browser chat with local models): http://localhost:3000
 
 ---
 
+## Verified LiteLLM Patches + Claude Code + Ollama (1–2–3–4)
+
+> **Status:** Patches verified on LiteLLM 1.44.2 + Ollama + Intel Arc 140T.
+> Multi-tool JSON→tool\_use confirmed working. For reliable complex agentic tasks use
+> `qwen2.5-coder:14b`, `:32b`, or `devstral`. Full maintenance guide:
+> [`docs/LITELLM_PATCH_MAINTENANCE.md`](./docs/LITELLM_PATCH_MAINTENANCE.md).
+
+LiteLLM 1.44.2's `ollama_chat/` adapter has several bugs that break Claude Code
+tool-use with local models. Four patches in [`litellm/patches/`](./litellm/patches/)
+fix them. Apply once after each container start — no restart needed.
+
+### Step 1 — Start containers and pull a model
+
+```powershell
+# Start Open WebUI + LiteLLM proxy
+make win-cloud
+
+# Verify LiteLLM is alive
+Invoke-RestMethod http://localhost:4000/health/liveliness   # → "I'm alive!"
+
+# Pull a model — 14b or larger strongly recommended for agentic coding
+ollama pull qwen2.5-coder:14b    # ~9 GB, reliable tool schema compliance
+ollama pull devstral             # ~14 GB, purpose-built for agentic coding
+# 7b works for simple completions only — see Model Notes below
+```
+
+### Step 2 — Apply the four LiteLLM patches
+
+```powershell
+$patches = "C:\Edge\edgeexpert\EdgeExpert\litellm\patches"
+docker cp "$patches\ollama_chat_patched.py"   edge-litellm:/app/litellm/llms/ollama_chat.py
+docker cp "$patches\litellm_main_patched.py"  edge-litellm:/app/litellm/main.py
+docker cp "$patches\proxy_server_patched.py"  edge-litellm:/app/litellm/proxy/proxy_server.py
+docker cp "$patches\factory_patched.py"       edge-litellm:/app/litellm/llms/prompt_templates/factory.py
+
+# Clear pyc cache so Python loads the patched files
+docker exec edge-litellm python3 -c "
+import glob, os
+for pat in ['/app/litellm/__pycache__/main*',
+            '/app/litellm/llms/__pycache__/ollama_chat*',
+            '/app/litellm/proxy/__pycache__/proxy_server*',
+            '/app/litellm/llms/prompt_templates/__pycache__/factory*']:
+    [os.remove(f) for f in glob.glob(pat)]
+print('pyc cleared')
+"
+```
+
+> Patches target `/app/litellm/` — **not** `/usr/local/lib/python3.11/site-packages/litellm/`.
+> Must be re-applied after every `docker restart edge-litellm` or `make win-down && make win-cloud`.
+
+### Step 3 — Smoke-test: confirm multi-tool JSON→tool\_use is working
+
+```powershell
+# Send a 2-tool request. stop_reason must be "tool_use", not "end_turn".
+$body = @{
+  model    = "qwen2.5-coder-cpu-hermes"
+  messages = @(@{ role = "user"; content = "List files in the project root." })
+  tools    = @(
+    @{ name = "Read"; description = "Read a file"
+       input_schema = @{ type = "object"; properties = @{ file_path = @{ type = "string" } }; required = @("file_path") } },
+    @{ name = "Glob"; description = "Find files by pattern"
+       input_schema = @{ type = "object"; properties = @{ pattern = @{ type = "string" } }; required = @("pattern") } }
+  )
+  max_tokens = 200
+} | ConvertTo-Json -Depth 10
+
+$r = Invoke-RestMethod http://localhost:4000/v1/messages `
+  -Method POST `
+  -Headers @{ "x-api-key" = "sk-changeme"; "anthropic-version" = "2023-06-01" } `
+  -ContentType "application/json" -Body $body
+$r.stop_reason   # expect: "tool_use"
+$r.content       # expect: block with type="tool_use"
+```
+
+If `stop_reason` is `"tool_use"` the patches are applied correctly.
+
+### Step 4 — Start a Claude Code session
+
+```powershell
+cd C:\your\repo
+$env:ANTHROPIC_BASE_URL = "http://localhost:4000"
+$env:ANTHROPIC_API_KEY  = "sk-changeme"   # must match LITELLM_MASTER_KEY in .env.windows
+
+# Interactive TUI (recommended):
+claude --model qwen2.5-coder-14b-hermes
+
+# One-shot (non-interactive):
+claude --model qwen2.5-coder-14b-hermes --print "Add a Quick Start section to README.md and commit it"
+```
+
+### Model behavior notes
+
+The LiteLLM patches are correct. The limiting factor for complex agentic tasks is **model size**.
+
+| Model | Size | Tool schema compliance | Reliable agentic coding | Notes |
+|---|---|---|---|---|
+| `qwen2.5-coder:7b` CPU | 7B | Poor | No | Invents tool names (`change_formula`, `EditFile`); loops after 60+ calls |
+| `qwen2.5-coder:14b` CPU | 14B | Good | Yes | Recommended minimum for agentic use; follows Claude Code schema |
+| `qwen2.5-coder:32b` CPU | 32B | Good | Yes | Near-Claude quality; needs ~20 GB RAM; ~2 tok/s |
+| `devstral` CPU | 24B | Excellent | Yes | Purpose-built for agentic coding; best tool compliance |
+| `deepseek-coder-v2:16b` CPU | 16B MoE | Good | Yes | 2.4B active params → fast (~5–8 tok/s CPU) |
+
+**Why qwen2.5-coder:7b fails complex agentic tasks:** The 7B model generates
+`{"command": "Read", "file_path": "..."}` instead of the expected tool-call structure,
+or invents tool names not in Claude Code's schema (`change_formula`, `EditFile`).
+The `ollama_chat_patched.py` handles key aliasing (`command`/`tool`/`action` → `name`,
+`params`/`parameters` → `arguments`) but cannot recover from entirely fabricated tool names.
+The model then enters a confusion loop. **Use 14b+ for reliable agentic tasks.**
+
+**Intel Arc 140T GPU:** All Vulkan GPU variants crash on sustained agentic load
+(15+ tool calls). CPU-only is the stable path on this hardware. GPU works for
+simple chat in Open WebUI but not long Claude Code sessions.
+See [`docs/LITELLM_PATCH_MAINTENANCE.md`](./docs/LITELLM_PATCH_MAINTENANCE.md) for details.
+
+---
+
 ## 🌐 End-to-end: Web UI → local model → GitHub PR
 
 This is the full Codex / Claude-Code-style loop using **only the browser** for the
