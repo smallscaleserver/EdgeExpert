@@ -239,6 +239,13 @@ def get_ollama_response(
     format = optional_params.pop("format", None)
     function_name = optional_params.pop("function_name", None)
     tools = optional_params.pop("tools", None)
+    try:
+        import os as _os
+        with open("/tmp/ollama_debug.log", "a") as _f:
+            _f.write(f"get_ollama_response: pid={_os.getpid()} stream={stream!r} format={format!r} fn={function_name!r} has_tools={tools is not None} acompletion={acompletion} model={model!r}\n")
+            _f.flush()
+    except Exception as _ex:
+        pass
 
     new_messages = []
     for m in messages:
@@ -350,25 +357,37 @@ def get_ollama_response(
 
     ## RESPONSE OBJECT
     model_response.choices[0].finish_reason = "stop"
-    if data.get("format", "") == "json" and function_name is not None:
-        function_call = json.loads(response_json["message"]["content"])
-        message = litellm.Message(
-            content=None,
-            tool_calls=[
-                {
-                    "id": f"call_{str(uuid.uuid4())}",
-                    "function": {
-                        "name": function_call.get("name", function_name),
-                        "arguments": json.dumps(
-                            function_call.get("arguments", function_call)
-                        ),
-                    },
-                    "type": "function",
-                }
-            ],
-        )
-        model_response.choices[0].message = message  # type: ignore
-        model_response.choices[0].finish_reason = "tool_calls"
+    if data.get("format", "") == "json":
+        try:
+            function_call = json.loads(response_json["message"]["content"])
+            _name_keys = {"name", "function", "command", "tool", "action"}
+            _args_keys = {"arguments", "args", "parameters", "params"}
+            _name = next((function_call[k] for k in _name_keys if k in function_call and function_call[k]), function_name)
+            _args = next((function_call[k] for k in _args_keys if k in function_call and function_call[k]), None)
+            if _args is None:
+                _args = {k: v for k, v in function_call.items() if k not in _name_keys}
+            if _name:
+                message = litellm.Message(
+                    content=None,
+                    tool_calls=[
+                        {
+                            "id": f"call_{str(uuid.uuid4())}",
+                            "function": {
+                                "name": _name,
+                                "arguments": json.dumps(_args) if not isinstance(_args, str) else _args,
+                            },
+                            "type": "function",
+                        }
+                    ],
+                )
+                model_response.choices[0].message = message  # type: ignore
+                model_response.choices[0].finish_reason = "tool_calls"
+            else:
+                _message = litellm.Message(**response_json["message"])
+                model_response.choices[0].message = _message  # type: ignore
+        except Exception:
+            _message = litellm.Message(**response_json["message"])
+            model_response.choices[0].message = _message  # type: ignore
     else:
         _message = litellm.Message(**response_json["message"])
         model_response.choices[0].message = _message  # type: ignore
@@ -557,38 +576,56 @@ async def ollama_acompletion(
             ## RESPONSE OBJECT
             model_response.choices[0].finish_reason = "stop"
 
-            if data.get("format", "") == "json" and function_name is not None:
-                function_call = json.loads(response_json["message"]["content"])
-                message = litellm.Message(
-                    content=None,
-                    tool_calls=[
-                        {
-                            "id": f"call_{str(uuid.uuid4())}",
-                            "function": {
-                                "name": function_call.get("name", function_name),
-                                "arguments": json.dumps(
-                                    function_call.get("arguments", function_call)
-                                ),
-                            },
-                            "type": "function",
-                        }
-                    ],
-                )
-                model_response.choices[0].message = message  # type: ignore
-                model_response.choices[0].finish_reason = "tool_calls"
+            try:
+                import os as _os2
+                with open("/tmp/ollama_debug.log", "a") as _dbgf:
+                    _dbgf.write(f"ollama_acomp pid={_os2.getpid()} format={data.get('format')!r} fn={function_name!r} content={str(response_json.get('message',{}).get('content',''))[:80]!r}\n")
+                    _dbgf.flush()
+            except Exception as _ex2:
+                pass
+
+            if data.get("format", "") == "json":
+                try:
+                    function_call = json.loads(response_json["message"]["content"])
+                    _name_keys = {"name", "function", "command", "tool", "action"}
+                    _args_keys = {"arguments", "args", "parameters", "params"}
+                    _name = next((function_call[k] for k in _name_keys if k in function_call and function_call[k]), function_name)
+                    _args = next((function_call[k] for k in _args_keys if k in function_call and function_call[k]), None)
+                    if _args is None:
+                        # Model put args at top level — extract non-name keys
+                        _args = {k: v for k, v in function_call.items() if k not in _name_keys}
+                    if _name:
+                        message = litellm.Message(
+                            content=None,
+                            tool_calls=[
+                                {
+                                    "id": f"call_{str(uuid.uuid4())}",
+                                    "function": {
+                                        "name": _name,
+                                        "arguments": json.dumps(_args) if not isinstance(_args, str) else _args,
+                                    },
+                                    "type": "function",
+                                }
+                            ],
+                        )
+                        model_response.choices[0].message = message  # type: ignore
+                        model_response.choices[0].finish_reason = "tool_calls"
+                    else:
+                        _message = litellm.Message(**response_json["message"])
+                        model_response.choices[0].message = _message  # type: ignore
+                except Exception:
+                    _message = litellm.Message(**response_json["message"])
+                    model_response.choices[0].message = _message  # type: ignore
             else:
                 _message = litellm.Message(**response_json["message"])
                 model_response.choices[0].message = _message  # type: ignore
 
             model_response.created = int(time.time())
             model_response.model = "ollama_chat/" + data["model"]
-            prompt_tokens = response_json.get("prompt_eval_count", litellm.token_counter(messages=data["messages"]))  # type: ignore
-            completion_tokens = response_json.get(
-                "eval_count",
-                litellm.token_counter(
-                    text=response_json["message"]["content"], count_response_tokens=True
-                ),
-            )
+            # Use Ollama's native token counts; fall back to 0 to avoid token_counter crash on tool_call dicts.
+            prompt_tokens = response_json.get("prompt_eval_count", 0)
+            _content = response_json.get("message", {}).get("content") or ""
+            completion_tokens = response_json.get("eval_count", 0)
             setattr(
                 model_response,
                 "usage",

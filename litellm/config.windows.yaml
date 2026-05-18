@@ -71,6 +71,29 @@ model_list:
       timeout: 21600
       stream_timeout: 21600
 
+  # qwen2.5-coder-partial-hermes: partial GPU via ollama_chat/ for Claude Code tool-use.
+  # 20/28 layers on GPU → ~3.8 GB VRAM — more stable than full-GPU (qwen2.5-coder-8k).
+  # Intel Arc 140T Vulkan full-GPU crashes after ~7 min; partial offload avoids this.
+  # Uses hermes-style JSON mode for tool call parsing (same as qwen2.5-coder-8k-hermes).
+  - model_name: qwen2.5-coder-partial-hermes
+    litellm_params:
+      model: ollama_chat/qwen2.5-coder-partial
+      api_base: http://host.docker.internal:11434
+      api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
+
+  # qwen2.5-coder-stable: ultra-stable GPU variant for Intel Arc 140T.
+  # 14/28 GPU layers + num_batch 16 + num_ctx 4096 — minimizes Vulkan crash risk.
+  # Trade-off: slower prompt eval due to num_batch 16, but generation stays ~10 tok/s.
+  - model_name: qwen2.5-coder-stable
+    litellm_params:
+      model: ollama_chat/qwen2.5-coder-stable
+      api_base: http://host.docker.internal:11434
+      api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
+
   # qwen2.5-coder-cpu: CPU-only fallback (~4 tok/s). Never crashes, any prompt length.
   - model_name: qwen2.5-coder-cpu
     litellm_params:
@@ -175,6 +198,18 @@ model_list:
       timeout: 21600
       stream_timeout: 21600
 
+  # devstral-cpu: CPU-only devstral for Claude Code tool-use on Intel Arc 140T.
+  # devstral is purpose-built for agentic coding and follows Claude Code tool schema.
+  # Slow (~2-4 tok/s) but stable — no Vulkan crash, no GPU needed.
+  - model_name: devstral-cpu
+    litellm_params:
+      model: ollama_chat/devstral-cpu
+      api_base: http://host.docker.internal:11434
+      api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
+      tool_call_parser: hermes
+
   # devstral-32k: large context for deep multi-file tasks.
   # Note: 21 GB VRAM on Vulkan — if the runner crashes, use devstral-8k.
   - model_name: devstral-32k
@@ -217,6 +252,27 @@ model_list:
     litellm_params:
       model: openai/mistral-small:22b
       api_base: http://host.docker.internal:11434/v1
+      api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
+
+  # --- DeepSeek Coder V2 Lite (16B total, 2.4B active MoE) -----------------
+  # Lite variant: only 2.4B params active per token → fast inference even on CPU.
+  # GPU variant: fast but may crash Vulkan on Intel Arc 140T.
+  - model_name: deepseek-coder-v2
+    litellm_params:
+      model: ollama_chat/deepseek-coder-v2:16b
+      api_base: http://host.docker.internal:11434
+      api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
+
+  # deepseek-coder-v2-cpu: CPU-only, stable — no Vulkan crash.
+  # MoE with 2.4B active params → reasonable CPU speed (~5-8 tok/s).
+  - model_name: deepseek-coder-v2-cpu
+    litellm_params:
+      model: ollama_chat/deepseek-coder-v2-cpu
+      api_base: http://host.docker.internal:11434
       api_key: ollama
       timeout: 21600
       stream_timeout: 21600
