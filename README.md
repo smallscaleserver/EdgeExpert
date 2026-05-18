@@ -508,6 +508,133 @@ See [`docs/LITELLM_PATCH_MAINTENANCE.md`](./docs/LITELLM_PATCH_MAINTENANCE.md) f
 
 ---
 
+## Local AI → Edit Code → Push to GitHub: Complete Session Guide
+
+End-to-end workflow verified on Intel Arc 140T (Windows 11). Covers GPU setup,
+correct patch order, and running Claude Code to edit a file and push to GitHub.
+
+### Prerequisites — one-time setup
+
+```powershell
+# 1. Enable Intel Arc GPU for Ollama (run once as Administrator from EdgeExpert folder)
+powershell -ExecutionPolicy Bypass -File scripts\win-tune-ollama.ps1
+
+# 2. Pull a model large enough to use Claude Code tools reliably
+ollama pull qwen2.5-coder:14b   # ~9 GB — minimum recommended
+# or:
+ollama pull devstral             # ~14 GB — best for agentic coding
+```
+
+> **Do not use the 7b model for agentic coding.** It outputs `{"command":"Edit",...}`
+> as plain text instead of calling Claude Code's actual tools. This is a model quality
+> limit — it fails on GPU and CPU equally. Use 14b or larger.
+
+### Step 1 — Start the stack
+
+```powershell
+cd C:\Edge\edgeexpert\EdgeExpert
+make win-cloud
+```
+
+Verify:
+```powershell
+Invoke-RestMethod http://localhost:4000/health/liveliness   # → I'm alive!
+docker ps   # edge-litellm and edge-open-webui must show "Up"
+```
+
+### Step 2 — Apply patches THEN restart (order is critical)
+
+```powershell
+# Apply the four patch files FIRST
+$p = "C:\Edge\edgeexpert\EdgeExpert\litellm\patches"
+docker cp "$p\ollama_chat_patched.py"   edge-litellm:/app/litellm/llms/ollama_chat.py
+docker cp "$p\litellm_main_patched.py"  edge-litellm:/app/litellm/main.py
+docker cp "$p\proxy_server_patched.py"  edge-litellm:/app/litellm/proxy/proxy_server.py
+docker cp "$p\factory_patched.py"       edge-litellm:/app/litellm/llms/prompt_templates/factory.py
+
+# THEN restart the container
+docker restart edge-litellm
+
+# Wait for it to come back
+Start-Sleep -Seconds 20
+Invoke-RestMethod http://localhost:4000/health/liveliness   # → I'm alive!
+```
+
+> **Why this order matters:** Python caches imported modules in `sys.modules` at
+> process startup. If you patch after restart, the running process already has the
+> old (unpatched) code in memory — file changes on disk are ignored. Patching first
+> means the fresh process imports the patched files from cold start.
+
+Confirm the patched file is what Python loaded:
+```powershell
+docker exec edge-litellm python3 -c "import litellm.llms.ollama_chat as m; print(m.__file__)"
+# must print: /app/litellm/llms/ollama_chat.py   (NOT /usr/local/lib/...)
+```
+
+### Step 3 — Load the GPU model
+
+```powershell
+# Unload any CPU model that may be resident
+ollama stop qwen2.5-coder-cpu
+
+# Send a warmup request to load the GPU model into VRAM
+$body = '{"model":"qwen2.5-coder-8k","messages":[{"role":"user","content":"hi"}],"max_tokens":5}'
+Invoke-RestMethod http://localhost:11434/api/chat -Method POST `
+  -ContentType "application/json" -Body $body -TimeoutSec 300 | Out-Null
+
+# Confirm GPU is active
+ollama ps
+# NAME                      PROCESSOR    ← must show: 100% GPU
+# qwen2.5-coder-8k:latest   100% GPU
+```
+
+### Step 4 — Run Claude Code against your repo
+
+```powershell
+cd C:\your\project   # e.g. C:\testlab\testgo\testgo
+
+$env:ANTHROPIC_BASE_URL = "http://localhost:4000"
+$env:ANTHROPIC_API_KEY  = "sk-changeme"   # must match LITELLM_MASTER_KEY in .env.windows
+
+# Interactive session (full TUI):
+claude --model qwen2.5-coder-8k-hermes
+
+# One-shot (runs task and exits):
+claude --model qwen2.5-coder-8k-hermes --print `
+  "In main.go change the formula to a*a+2*a*b+b*b, update printf to 'a*a+2*a*b+b*b = %d', git commit as 'feat: change formula to (a+b)^2', and git push origin main."
+```
+
+### Step 5 — Verify and push
+
+```powershell
+cat main.go            # confirm the change is in the file
+git diff               # review what changed
+git log --oneline -3   # confirm the commit exists
+git push origin main   # push (or model may have already pushed)
+```
+
+### Session cheatsheet
+
+```powershell
+# Start everything fresh each session:
+make win-cloud
+$p = "C:\Edge\edgeexpert\EdgeExpert\litellm\patches"
+docker cp "$p\ollama_chat_patched.py"   edge-litellm:/app/litellm/llms/ollama_chat.py
+docker cp "$p\litellm_main_patched.py"  edge-litellm:/app/litellm/main.py
+docker cp "$p\proxy_server_patched.py"  edge-litellm:/app/litellm/proxy/proxy_server.py
+docker cp "$p\factory_patched.py"       edge-litellm:/app/litellm/llms/prompt_templates/factory.py
+docker restart edge-litellm
+Start-Sleep -Seconds 20
+ollama stop qwen2.5-coder-cpu
+# (warmup request — see Step 3)
+cd C:\your\repo
+$env:ANTHROPIC_BASE_URL = "http://localhost:4000"
+$env:ANTHROPIC_API_KEY  = "sk-changeme"
+claude --model qwen2.5-coder-8k-hermes
+```
+
+---
+
 ## 🌐 End-to-end: Web UI → local model → GitHub PR
 
 This is the full Codex / Claude-Code-style loop using **only the browser** for the
