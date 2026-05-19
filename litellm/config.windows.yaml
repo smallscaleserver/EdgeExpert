@@ -210,6 +210,17 @@ model_list:
       stream_timeout: 21600
       tool_call_parser: hermes
 
+  # devstral-cpu-native: same CPU model but via OpenAI-compatible endpoint.
+  # Uses Ollama's native structured tool_calls instead of JSON mode injection.
+  # This is the correct path — tool names and inputs are always exact.
+  - model_name: devstral-cpu-native
+    litellm_params:
+      model: openai/devstral-cpu
+      api_base: http://host.docker.internal:11434/v1
+      api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
+
   # devstral-32k: large context for deep multi-file tasks.
   # Note: 21 GB VRAM on Vulkan — if the runner crashes, use devstral-8k.
   - model_name: devstral-32k
@@ -266,6 +277,7 @@ model_list:
       api_key: ollama
       timeout: 21600
       stream_timeout: 21600
+      tool_call_parser: hermes
 
   # deepseek-coder-v2-cpu: CPU-only, stable — no Vulkan crash.
   # MoE with 2.4B active params → reasonable CPU speed (~5-8 tok/s).
@@ -276,6 +288,7 @@ model_list:
       api_key: ollama
       timeout: 21600
       stream_timeout: 21600
+      tool_call_parser: hermes
 
   # --- Legacy / kept for compatibility ---------------------------------------
   - model_name: nemotron-nano

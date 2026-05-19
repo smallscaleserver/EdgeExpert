@@ -633,6 +633,32 @@ $env:ANTHROPIC_API_KEY  = "sk-changeme"
 claude --model qwen2.5-coder-8k-hermes
 ```
 
+### Real-world test findings — Intel Arc 140T (Windows 11)
+
+Tested May 2026 across all available local models. Summary of what actually works
+for a full Claude Code agentic loop (Read → Edit → git commit → git push):
+
+| Model | Provider path | Result |
+|---|---|---|
+| `qwen2.5-coder:7b` | `ollama_chat/` + hermes | **Fails** — invents tool names (`{"command":"Edit"}`) |
+| `qwen2.5-coder-8k` | `openai/` native | **GPU crash** after 15+ tool calls (Vulkan Arc 140T) |
+| `qwen2.5-coder-8k-hermes` | `ollama_chat/` + hermes | **GPU crash** same as above |
+| `devstral-8k` | `openai/` native | **GPU crash** after sustained load |
+| `devstral-cpu` | `ollama_chat/` + hermes | Correct tool names, but **stalls** in long agentic loop |
+| `devstral-cpu-native` | `openai/` native | Correct tool names, single calls verified, but **stalls** on full loop (>2 hrs, no progress) |
+| `deepseek-coder-v2-cpu` | `ollama_chat/` + hermes | **Fails** — calls tool named `"main"` instead of `"Read"` |
+| Claude Sonnet via Anthropic API | cloud | **Works** — fast, reliable, every time |
+
+**Conclusion:** On Intel Arc 140T with Vulkan, no local model completes a full
+multi-file agentic coding loop reliably. GPU models crash after sustained load;
+CPU models either invent tool names or stall before completing the task.
+
+**Practical recommendation:**
+- Use **Claude Sonnet via Anthropic API** for actual agentic coding tasks (set `ANTHROPIC_BASE_URL` to unset / default).
+- Use **local models in Open WebUI** for chat, code review, and single-step generation where you apply the change yourself.
+- The GPU fallback chain (`qwen2.5-coder-8k` → `partial` → `stable`) keeps the GPU models alive longer but does not prevent eventual failure.
+- Once NVIDIA DGX Spark or a proper CUDA GPU is available, re-test `devstral:24b` — it is purpose-built for agentic coding and the issues above are hardware-specific (Vulkan instability).
+
 ---
 
 ## 🌐 End-to-end: Web UI → local model → GitHub PR
