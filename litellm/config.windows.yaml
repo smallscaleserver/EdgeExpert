@@ -318,11 +318,18 @@ litellm_settings:
   tool_call_parser: hermes
 
 router_settings:
-  # If qwen2.5-coder-partial (partial GPU) fails with a 500 (Vulkan crash),
-  # automatically retry with qwen2.5-coder-cpu (CPU-only, always stable).
+  # GPU fallback chain for Intel Arc 140T Vulkan stability.
+  # On a 500 error (Vulkan crash), step down to fewer GPU layers — never to CPU.
+  #   Full GPU (28/28)  →  Partial GPU (20/28)  →  Stable GPU (14/28)
   fallbacks:
+    - qwen2.5-coder-8k-hermes:
+        - qwen2.5-coder-partial-hermes
+    - qwen2.5-coder-partial-hermes:
+        - qwen2.5-coder-stable
+    - qwen2.5-coder-8k:
+        - qwen2.5-coder-partial
     - qwen2.5-coder-partial:
-        - qwen2.5-coder-cpu
+        - qwen2.5-coder-stable
   num_retries: 1
   retry_after: 0
 
