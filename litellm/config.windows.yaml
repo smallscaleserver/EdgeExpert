@@ -318,15 +318,11 @@ litellm_settings:
   tool_call_parser: hermes
 
 router_settings:
-  # If a GPU/Vulkan model fails with a 500 (runner crash on Intel Arc 140T),
-  # automatically retry with its CPU-only counterpart (always stable).
+  # If qwen2.5-coder-partial (partial GPU) fails with a 500 (Vulkan crash),
+  # automatically retry with qwen2.5-coder-cpu (CPU-only, always stable).
   fallbacks:
     - qwen2.5-coder-partial:
         - qwen2.5-coder-cpu
-    - qwen2.5-coder-8k-hermes:
-        - qwen2.5-coder-cpu-hermes
-    - qwen2.5-coder-partial-hermes:
-        - qwen2.5-coder-cpu-hermes
   num_retries: 1
   retry_after: 0
 
