@@ -271,19 +271,51 @@ def get_ollama_response(
                     parts.append(str(inner) if inner else "")
             m["content"] = "\n".join(parts)
         if m.get("tool_calls") is not None and isinstance(m["tool_calls"], list):
-            new_tools: List[OllamaToolCall] = []
-            for tool in m["tool_calls"]:
-                typed_tool = ChatCompletionAssistantToolCall(**tool)  # type: ignore
-                if typed_tool["type"] == "function":
-                    ollama_tool_call = OllamaToolCall(
-                        function=OllamaToolCallFunction(
-                            name=typed_tool["function"]["name"],
-                            arguments=json.loads(typed_tool["function"]["arguments"]),
+            if format == "json":
+                # Hermes/json mode: model generated tool calls as plain JSON text.
+                # Replay them in the same format so the model sees a consistent conversation.
+                # Using structured tool_calls here breaks the model's understanding because
+                # it originally wrote {"name": ..., "arguments": ...} as text content.
+                m = dict(m)
+                calls = []
+                for tool in m["tool_calls"]:
+                    typed_tool = ChatCompletionAssistantToolCall(**tool)  # type: ignore
+                    if typed_tool["type"] == "function":
+                        calls.append({
+                            "name": typed_tool["function"]["name"],
+                            "arguments": json.loads(typed_tool["function"]["arguments"]),
+                        })
+                m["content"] = json.dumps(calls[0]) if len(calls) == 1 else json.dumps(calls)
+                del m["tool_calls"]
+            else:
+                new_tools: List[OllamaToolCall] = []
+                for tool in m["tool_calls"]:
+                    typed_tool = ChatCompletionAssistantToolCall(**tool)  # type: ignore
+                    if typed_tool["type"] == "function":
+                        ollama_tool_call = OllamaToolCall(
+                            function=OllamaToolCallFunction(
+                                name=typed_tool["function"]["name"],
+                                arguments=json.loads(typed_tool["function"]["arguments"]),
+                            )
                         )
-                    )
-                    new_tools.append(ollama_tool_call)
-            m["tool_calls"] = new_tools
+                        new_tools.append(ollama_tool_call)
+                m["tool_calls"] = new_tools
+        # In hermes/json mode, convert role=tool messages to role=user so the model
+        # sees tool results in the same format as the tool schema injection expects.
+        if format == "json" and m.get("role") == "tool":
+            m = dict(m)
+            m["role"] = "user"
+            m.pop("tool_call_id", None)
         new_messages.append(m)
+
+    # Strip non-Ollama params that destabilize the runner (Ollama 0.24.0+)
+    _invalid_opts = {
+        "timeout", "stream_timeout", "tool_call_parser", "thinking",
+        "context_management", "output_config", "functions_unsupported_model",
+        "request_timeout",
+    }
+    for _k in _invalid_opts:
+        optional_params.pop(_k, None)
 
     data = {
         "model": model,

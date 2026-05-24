@@ -153,6 +153,19 @@ model_list:
       timeout: 21600
       stream_timeout: 21600
 
+  # qwen2.5-coder-14b-stable: 14B GPU model safe for Intel Arc 140T.
+  # num_batch=64 → 256ms per Vulkan submit (safe under 2s TDR threshold).
+  # ollama_chat/ + hermes: converts plain {"name":...,"arguments":...} text → proper tool_calls API format.
+  # 14B model generates correct tool call JSON (verified). Loads at 100% GPU in 6.9s.
+  - model_name: qwen2.5-coder-14b-stable
+    litellm_params:
+      model: ollama_chat/qwen2.5-coder-14b-stable
+      api_base: http://host.docker.internal:11434
+      api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
+      tool_call_parser: hermes
+
   - model_name: qwen2.5-coder:32b
     litellm_params:
       model: openai/qwen2.5-coder:32b
@@ -193,6 +206,18 @@ model_list:
   - model_name: devstral
     litellm_params:
       model: openai/devstral
+      api_base: http://host.docker.internal:11434/v1
+      api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
+
+  # devstral-stable: GPU model with num_batch=64 to avoid Vulkan TDR crash on Intel Arc 140T.
+  # Root cause: BatchSize=512 → 40 layers × 512 tokens ≈ 2s per Vulkan submit → Windows TDR fires.
+  # Fix: num_batch=64 → 40 × 64 × 0.1ms = 256ms per submit — safe under 2s TDR threshold.
+  # Uses openai/ provider for native structured tool_calls (no hermes parser needed).
+  - model_name: devstral-stable
+    litellm_params:
+      model: openai/devstral-stable
       api_base: http://host.docker.internal:11434/v1
       api_key: ollama
       timeout: 21600

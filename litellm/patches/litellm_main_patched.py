@@ -4038,8 +4038,12 @@ async def aadapter_completion(
 
         new_kwargs = translation_obj.translate_completion_input_params(kwargs=kwargs)
         new_kwargs['stream'] = False  # force non-streaming; SSE done by async_data_generator_anthropic
+        # translate_completion_input_params strips non-Anthropic kwargs (timeout, api_key, etc).
+        # Restore timeout so acompletion doesn't fall back to openai library's 600s default.
+        new_kwargs['timeout'] = kwargs.get('timeout', 21600)
+        new_kwargs['request_timeout'] = kwargs.get('timeout', 21600)
 
-        with open("/tmp/ollama_debug.log", "a") as _f: _f.write(f"aadapter: model={new_kwargs.get('model')!r} stream={new_kwargs.get('stream')!r} tools={'tools' in new_kwargs}\n")
+        with open("/tmp/ollama_debug.log", "a") as _f: _f.write(f"aadapter: model={new_kwargs.get('model')!r} stream={new_kwargs.get('stream')!r} tools={'tools' in new_kwargs} timeout={new_kwargs.get('timeout')!r}\n")
         response: Union[ModelResponse, CustomStreamWrapper] = await acompletion(**new_kwargs)  # type: ignore
         with open("/tmp/ollama_debug.log", "a") as _f: _f.write(f"aadapter: response type={type(response).__name__}\n")
         translated_response: Optional[

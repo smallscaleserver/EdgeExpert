@@ -44,6 +44,17 @@ if ($Upgrade) {
     Write-Host ""
 }
 
+# --- Step 0: fix Windows TDR (GPU watchdog) timeout --------------------------
+# Root cause of Vulkan crash on Intel Arc: default TdrDelay=2s.
+# With BatchSize=512 and a 14B model, one Vulkan submit takes ~2s → TDR fires →
+# VK_ERROR_DEVICE_LOST → ggml-vulkan throws C++ exception → runner crashes.
+# Fix: raise TdrDelay to 60s so GPU ops have time to complete. Requires reboot.
+Write-Host "  Setting TdrDelay=60 (GPU watchdog) ..." -ForegroundColor Yellow
+$tdrKey = "HKLM:\System\CurrentControlSet\Control\GraphicsDrivers"
+New-ItemProperty -Path $tdrKey -Name "TdrDelay"    -Value 60 -PropertyType DWORD -Force | Out-Null
+New-ItemProperty -Path $tdrKey -Name "TdrDdiDelay" -Value 60 -PropertyType DWORD -Force | Out-Null
+Write-Host "  TdrDelay=60, TdrDdiDelay=60 set. Reboot once to apply." -ForegroundColor Green
+
 # --- Step 1: persist env vars to User registry (survives reboots) ----------
 # Thread budget: 16 logical processors on Core Ultra 7 265H
 #    8 for Ollama  -> model runs steadily
@@ -163,6 +174,22 @@ foreach ($m in $models) {
 
     Write-Host "  Creating $($m.name)-32k (32k ctx, 8 threads) ..." -ForegroundColor Cyan
     & $ollamaExe create "$($m.name)-32k" -f $tmpFile 2>&1 | Where-Object { $_ -match "success|error|Error" }
+}
+
+# --- Step 3b: create devstral-stable (GPU-safe for Intel Arc 140T Vulkan) -----
+# num_batch=64 keeps each Vulkan command buffer under 256ms (safe under 2s TDR).
+# num_ctx=8192: fits Claude Code session (system prompt + multi-turn tool calls).
+Write-Host ""
+Write-Host "  Creating devstral-stable (GPU-safe: num_batch=64, 8k ctx) ..." -ForegroundColor Cyan
+$stableCheck = Invoke-RestMethod http://localhost:11434/api/tags -ErrorAction SilentlyContinue
+$devstralExists = $stableCheck.models | Where-Object { $_.name -eq "devstral:latest" }
+if ($devstralExists) {
+    $stableFile = "$tmpDir\devstral-stable.modelfile"
+    Set-Content -Path $stableFile -Encoding UTF8 -Value "FROM devstral:latest`nPARAMETER num_ctx 8192`nPARAMETER num_batch 64`nPARAMETER num_thread 8"
+    & $ollamaExe create "devstral-stable" -f $stableFile 2>&1 | Where-Object { $_ -match "success|error|Error" }
+    Write-Host "  devstral-stable created." -ForegroundColor Green
+} else {
+    Write-Host "  SKIP devstral-stable (devstral:latest not pulled)" -ForegroundColor DarkGray
 }
 
 Write-Host ""
