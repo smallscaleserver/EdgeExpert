@@ -114,10 +114,59 @@ model_list:
       model: ollama/mistral-small:22b
       api_base: http://ollama:11434
 
-  # --- Legacy / kept for compatibility ---------------------------------------
+  # --- NVIDIA Nemotron -------------------------------------------------------
+  - model_name: nemotron
+    litellm_params:
+      model: ollama/nemotron:latest
+      api_base: http://ollama:11434
+
   - model_name: nemotron-nano
     litellm_params:
-      model: ollama/nemotron3:nano-instruct
+      model: ollama/nemotron-3-nano:latest
+      api_base: http://ollama:11434
+
+  # --- Local models (DGX Spark / GB10, 128 GB unified memory) ---------------
+  # gemma4 family — vision capable, thinking architecture
+  - model_name: localmodel26b
+    litellm_params:
+      model: ollama/localmodel26b:latest
+      api_base: http://ollama:11434
+
+  - model_name: localmodel26b-32k
+    litellm_params:
+      model: ollama/localmodel26b-32k:latest
+      api_base: http://ollama:11434
+
+  - model_name: gemma4
+    litellm_params:
+      model: ollama/gemma4:26b
+      api_base: http://ollama:11434
+
+  - model_name: gemma4-32k
+    litellm_params:
+      model: ollama/gemma4-32k:latest
+      api_base: http://ollama:11434
+
+  # qwen3-coder — best for agentic coding + tool use (Roo, OpenHands)
+  - model_name: qwen3-coder
+    litellm_params:
+      model: ollama/qwen3-coder:30b
+      api_base: http://ollama:11434
+
+  - model_name: qwen3-coder-32k
+    litellm_params:
+      model: ollama/qwen3-coder-32k:latest
+      api_base: http://ollama:11434
+
+  # qwen2.5-vl — vision + language
+  - model_name: qwen2.5vl
+    litellm_params:
+      model: ollama/qwen2.5vl:7b
+      api_base: http://ollama:11434
+
+  - model_name: qwen2.5vl-32k
+    litellm_params:
+      model: ollama/qwen2.5vl-32k:latest
       api_base: http://ollama:11434
 
   # --- LM Studio (host-side desktop app) -------------------------------------
@@ -174,3 +223,4 @@ litellm_settings:
 
 general_settings:
   max_request_timeout: 21600
+  master_key: os.environ/LITELLM_MASTER_KEY

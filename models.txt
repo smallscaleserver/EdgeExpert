@@ -29,3 +29,38 @@
 # ollama:qwen2.5-coder:7b      # default coding model for OpenCode / Claude MCP
 # ollama:nomic-embed-text      # only needed if you call ollama_embed
 # ollama:gpt-oss:20b           # OpenAI open-weights, ~13 GB; equivalent of the LM Studio model in youtube.com/watch?v=Cyn_Dm05_eU — pair with `bash scripts/33-setup-claude-local.sh gpt-oss`
+
+# =============================================================================
+# Active models (DGX Spark / GB10, 128 GB unified memory)
+# AI_DATA_ROOT bind mount — models persist at /mnt/edge-backup/ai-data/ollama
+# =============================================================================
+
+# --- Coding / agentic (recommended for Roo, OpenHands, Claude Code) ----------
+ollama:qwen3-coder:30b
+ollama:qwen3-coder-32k:latest
+
+# --- Coding (Qwen2.5 series) -------------------------------------------------
+ollama:qwen2.5-coder:7b
+ollama:qwen2.5-coder:14b
+ollama:qwen2.5-coder:32b
+
+# --- Reasoning / general (gemma4 family, vision capable) ---------------------
+ollama:localmodel26b:latest
+ollama:localmodel26b-32k:latest
+ollama:gemma4:26b
+ollama:gemma4-32k:latest
+
+# --- Vision + language -------------------------------------------------------
+ollama:qwen2.5vl:7b
+ollama:qwen2.5vl-32k:latest
+
+# --- NVIDIA Nemotron ---------------------------------------------------------
+ollama:nemotron:latest
+ollama:nemotron-3-nano:latest
+
+# --- Embedding ---------------------------------------------------------------
+ollama:nomic-embed-text
+
+# --- Misc --------------------------------------------------------------------
+ollama:gpt-oss:20b
+ollama:llama3.2:3b

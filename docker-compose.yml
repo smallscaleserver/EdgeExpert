@@ -249,8 +249,12 @@ services:
       # Default LLM endpoint = LiteLLM proxy on the shared compose network.
       # Users can still change this in the OpenHands settings UI; this just
       # pre-fills the form so first-run works without manual config.
-      LLM_BASE_URL: ${OPENHANDS_LLM_BASE_URL:-http://litellm:4000}
+      LLM_BASE_URL: ${OPENHANDS_LLM_BASE_URL:-http://localhost:4000}
       LLM_API_KEY: ${LITELLM_MASTER_KEY:-}
+      LLM_MODEL: ${OPENHANDS_LLM_MODEL:-qwen3-coder-32k}
+      # GitHub PAT for repo access (fine-grained token with repo read/write).
+      # Set GITHUB_TOKEN in .env. Without it, paste the token in OpenHands Settings.
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       # GitHub OAuth (optional). Without these set, the OpenHands UI lets you
       # paste a fine-grained PAT in Settings as a fallback. To enable OAuth:
       #   https://github.com/settings/developers → New OAuth App
@@ -271,7 +275,10 @@ services:
       # SANDBOX_CONTAINER_URL_PATTERN: URL template the frontend uses to reach
       #   agent-server exposed ports (VNC, VS Code, etc.). Replace {port} with
       #   the host-mapped port. Default localhost:{port} breaks on remote access.
-      SANDBOX_CONTAINER_URL_PATTERN: "http://192.168.1.6:{port}"
+      # OPENHANDS_HOST_IP: LAN IP of this machine (set in .env).
+      # Sandbox containers spawn on the default bridge — they need the host IP,
+      # not a container hostname, to reach exposed ports.
+      SANDBOX_CONTAINER_URL_PATTERN: "http://${OPENHANDS_HOST_IP:-localhost}:{port}"
 
     volumes:
       # Docker socket: required so OpenHands can launch sandbox containers.
