@@ -202,6 +202,27 @@ model_list:
       timeout: 21600
       stream_timeout: 21600
 
+  # --- qwen3-coder (best for agentic coding + tool use: Roo, OpenHands) -----
+  # MoE 30.5B — on Intel Arc 140T will use mostly system RAM (64 GB).
+  # Run time slower than Linux DGX Spark but functional.
+  - model_name: qwen3-coder
+    litellm_params:
+      model: openai/qwen3-coder:30b
+      api_base: http://host.docker.internal:11434/v1
+      api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
+
+  # qwen3-coder-32k: custom Modelfile variant with num_ctx=32768.
+  # Create locally: ollama pull qwen3-coder:30b && ollama create qwen3-coder-32k -f <Modelfile>
+  - model_name: qwen3-coder-32k
+    litellm_params:
+      model: openai/qwen3-coder-32k:latest
+      api_base: http://host.docker.internal:11434/v1
+      api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
+
   # --- Mistral coding agents -------------------------------------------------
   - model_name: devstral
     litellm_params:
@@ -318,7 +339,7 @@ model_list:
   # --- Legacy / kept for compatibility ---------------------------------------
   - model_name: nemotron-nano
     litellm_params:
-      model: openai/nemotron3:nano-instruct
+      model: openai/nemotron-3-nano:latest
       api_base: http://host.docker.internal:11434/v1
       api_key: ollama
       timeout: 21600
@@ -373,3 +394,4 @@ router_settings:
 
 general_settings:
   max_request_timeout: 21600  # 6 hours
+  master_key: os.environ/LITELLM_MASTER_KEY
