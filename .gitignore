@@ -6,3 +6,4 @@
 __pycache__/
 *.pyc
 .pr-notes.md
+note[0-9]*
