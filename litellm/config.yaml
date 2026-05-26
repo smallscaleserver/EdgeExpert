@@ -64,16 +64,6 @@ model_list:
       model: ollama/qwen2.5-coder-32k
       api_base: http://ollama:11434
 
-  - model_name: qwen2.5-coder:14b
-    litellm_params:
-      model: ollama/qwen2.5-coder:14b
-      api_base: http://ollama:11434
-
-  - model_name: qwen2.5-coder:32b
-    litellm_params:
-      model: ollama/qwen2.5-coder:32b
-      api_base: http://ollama:11434
-
   # --- qwen3 family (thinking mode supported) --------------------------------
   - model_name: qwen3:14b
     litellm_params:
@@ -137,11 +127,6 @@ model_list:
       model: ollama/localmodel26b-32k:latest
       api_base: http://ollama:11434
 
-  - model_name: gemma4
-    litellm_params:
-      model: ollama/gemma4:26b
-      api_base: http://ollama:11434
-
   - model_name: gemma4-32k
     litellm_params:
       model: ollama/gemma4-32k:latest
@@ -170,11 +155,6 @@ model_list:
       api_base: http://ollama:11434
 
   # qwen2.5-vl — vision + language
-  - model_name: qwen2.5vl
-    litellm_params:
-      model: ollama/qwen2.5vl:7b
-      api_base: http://ollama:11434
-
   - model_name: qwen2.5vl-32k
     litellm_params:
       model: ollama/qwen2.5vl-32k:latest
@@ -203,15 +183,20 @@ model_list:
       custom_llm_provider: openai
 
   # --- OpenAI ----------------------------------------------------------------
-  # Uncomment after setting OPENAI_PROVIDER_API_KEY in .env.
-  # - model_name: gpt-4o
-  #   litellm_params:
-  #     model: openai/gpt-4o
-  #     api_key: os.environ/OPENAI_API_KEY
-  # - model_name: gpt-4o-mini
-  #   litellm_params:
-  #     model: openai/gpt-4o-mini
-  #     api_key: os.environ/OPENAI_API_KEY
+  - model_name: gpt-4o
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: gpt-4o-mini
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: gpt-4.1
+    litellm_params:
+      model: openai/gpt-4.1
+      api_key: os.environ/OPENAI_API_KEY
 
   # --- Google Gemini ---------------------------------------------------------
   # Uncomment after setting GEMINI_API_KEY in .env.
