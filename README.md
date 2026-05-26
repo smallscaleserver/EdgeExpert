@@ -392,12 +392,52 @@ Open WebUI (browser chat with local models): http://localhost:3000
 
 ---
 
+## 🪄 Roo (VS Code Agentic Coding)
+
+[Roo](https://marketplace.visualstudio.com/items?itemName=rooveterinaryinc.roo-cline) is a VS Code extension for agentic coding — it reads your repo, plans tasks, edits files, runs git, and asks only when blocked. Works 100% locally via Ollama.
+
+### PC (Windows — Ollama native, http://127.0.0.1:11434)
+
+1. Install Roo from VS Code Marketplace (`rooveterinaryinc.roo-cline`)
+2. In Roo settings → **API Provider: Ollama**, **Base URL: `http://127.0.0.1:11434`**
+3. Select model (e.g. `qwen3-coder:30b` or `qwen2.5-coder:14b`)
+4. Set timeout to unlimited — add this to VS Code user settings (`Ctrl+Shift+P` → `Preferences: Open User Settings (JSON)`):
+   ```json
+   "roo-cline.apiRequestTimeout": 3600
+   ```
+5. Leave a task running overnight — Roo will keep working until done
+
+> **qwen3 thinking mode:** qwen3 models output `<think>` tokens that can break Roo's Ollama parser. If you see streaming issues, route through LiteLLM instead (`http://localhost:4000`, provider: OpenAI-compatible, model: `qwen3-coder`).
+
+### Linux / DGX Spark (Ollama direct — no LiteLLM needed)
+
+1. In Roo settings → **API Provider: Ollama**, **Base URL: `http://10.88.1.254:11434`**
+2. **API Key:** leave empty
+3. Select model (e.g. `qwen3-coder-next:latest` or `qwen3.6:27b`)
+4. Set VS Code timeout (same `roo-cline.apiRequestTimeout: 3600` as above)
+
+> DGX Spark (NVIDIA GB10) achieves ~11 tok/s generation on qwen3.6:27b and ~4–6 tok/s on qwen3-coder-next — fast enough for interactive agentic coding.
+
+### LiteLLM proxy mode (optional — strips thinking tokens, unified endpoint)
+
+If you want Roo to use LiteLLM (port 4000) instead of Ollama directly:
+- **API Provider:** OpenAI-compatible
+- **Base URL:** `http://localhost:4000/v1` (Windows) or `http://10.88.1.254:4000/v1` (Linux)
+- **API Key:** value of `LITELLM_MASTER_KEY` from `.env`
+- **Model:** `qwen3-coder` (as defined in `litellm/config.yaml`)
+
+---
+
 ## Verified LiteLLM Patches + Claude Code + Ollama (1–2–3–4)
 
-> **Status:** Patches verified on LiteLLM 1.44.2 + Ollama + Intel Arc 140T.
+> **Status:** Patches verified on LiteLLM main-latest + Ollama + Intel Arc 140T.
 > Multi-tool JSON→tool\_use confirmed working. For reliable complex agentic tasks use
 > `qwen2.5-coder:14b`, `:32b`, or `devstral`. Full maintenance guide:
 > [`docs/LITELLM_PATCH_MAINTENANCE.md`](./docs/LITELLM_PATCH_MAINTENANCE.md).
+>
+> **LiteLLM config selection:** Set `LITELLM_CONFIG_FILE=config.windows.yaml` in `.env.windows`
+> (already set) to use the Windows-specific config (OpenAI-compatible Ollama endpoint,
+> no PostgreSQL required). Linux uses `config.yaml` (default).
 
 LiteLLM 1.44.2's `ollama_chat/` adapter has several bugs that break Claude Code
 tool-use with local models. Four patches in [`litellm/patches/`](./litellm/patches/)
@@ -988,18 +1028,33 @@ The model directory (`${AI_DATA_ROOT}/ollama`) is bind-mounted into the containe
 
 ## 🤖 Recommended Models
 
-### Small (≤ 8 GB VRAM)
-- `qwen2.5-coder:7b` — coding
-- `llama3.2:3b` — general
-- `mistral:7b` — general
+### HP EliteBook / Intel Arc 140T (Windows, 36 GB shared VRAM)
 
-### Medium (16 GB VRAM)
-- `qwen2.5-coder:14b` — coding
-- `llama3.1:8b-instruct-q8_0` — high-quality general
+| Model | Size | Use case | Notes |
+|---|---|---|---|
+| `qwen2.5-coder:14b` | 9 GB | Reliable agentic coding | Minimum for Claude Code tool-use |
+| `qwen2.5-coder:32b` | 20 GB | Near-Claude quality | ~2 tok/s CPU; fits in 64 GB RAM |
+| `qwen3-coder:30b` | 19 GB | Agentic coding, 256K ctx | MoE — fast active params; use via LiteLLM |
+| `devstral` | 14 GB | Agentic coding | Purpose-built; use CPU variant for Arc stability |
 
-### Large (24 GB+ VRAM)
-- `qwen2.5-coder:32b`
-- `llama3.3:70b-instruct-q4_K_M`
+> **Intel Arc 140T note:** All full-GPU Vulkan variants eventually crash on sustained agentic load (15+ tool calls). Use CPU-hermes variants for reliable Claude Code sessions, or use **Roo + Ollama direct** for more stable streaming.
+
+### MSI EdgeExpert / NVIDIA DGX Spark — GB10 (128 GB unified memory)
+
+| Model | Size | Speed | Use case |
+|---|---|---|---|
+| `qwen3-coder:30b` | 19 GB | Fast | Agentic coding, 256K context |
+| `qwen3-coder-next:latest` | 52 GB | Good | Next-gen coder, 256K context |
+| `qwen3.6:27b` | 17 GB | 11 tok/s | Dense 27B, Gated DeltaNet, SWE-bench 77.2% |
+| `qwen2.5-coder:32b` | 20 GB | Fast | Reliable coding baseline |
+| `gemma4:26b` | ~17 GB | Fast | Vision-capable, thinking architecture |
+
+> **DGX Spark:** GB10 has 128 GB unified memory — all models above fit comfortably. Roo + Ollama direct (no LiteLLM needed) gives the best latency: ~4–11 tok/s on qwen3 family.
+
+### Small (≤ 8 GB VRAM / any machine)
+- `qwen2.5-coder:7b` — fast coding completions, not reliable for agentic loops
+- `llama3.2:3b` — general chat, very fast
+- `qwen2.5-coder:14b` — minimum for reliable tool-use
 
 See [`docs/MODEL-RECOMMENDATIONS.md`](./docs/MODEL-RECOMMENDATIONS.md) for full list.
 
