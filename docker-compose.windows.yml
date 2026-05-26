@@ -66,6 +66,41 @@ services:
         max-file: "2"
 
   # ---------------------------------------------------------------------------
+  # OPTIONAL: Open WebUI public — no-login access on a separate port
+  # Enable:  make win-public      Disable: make win-public-stop
+  # URL: http://<HOST_IP>:${PUBLIC_WEBUI_PORT:-3001}/
+  # ---------------------------------------------------------------------------
+  open-webui-public:
+    image: ${OPEN_WEBUI_IMAGE}
+    container_name: edge-open-webui-public
+    profiles: ["public"]
+    restart: unless-stopped
+
+    ports:
+      - "${PUBLIC_WEBUI_PORT:-3001}:8080"
+
+    environment:
+      OLLAMA_BASE_URL: http://host.docker.internal:${OLLAMA_PORT:-11434}
+      WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY}
+      WEBUI_AUTH: "False"
+      ENABLE_SIGNUP: "false"
+      ENABLE_OPENAI_API: ${ENABLE_OPENAI_API:-true}
+      OPENAI_API_BASE_URL: http://host.docker.internal:${LITELLM_PORT:-4000}/v1
+      OPENAI_API_KEY: ${LITELLM_MASTER_KEY:-sk-noop}
+
+    volumes:
+      - ${AI_DATA_ROOT}/open-webui-public:/app/backend/data
+
+    networks:
+      - edge-ai-net
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "2"
+
+  # ---------------------------------------------------------------------------
   # OPTIONAL: LiteLLM proxy — adds Claude / GPT / Gemini to the WebUI dropdown
   # Also re-exposes local Ollama models so Claude Code / OpenCode can reach them
   # via an Anthropic-compatible endpoint.

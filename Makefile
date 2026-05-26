@@ -6,7 +6,9 @@ SHELL := /usr/bin/env bash
         ai-review ai-fix ai-pr \
         up down webui codex claude-local claude-cloud claude-lmstudio \
         cloud-models lmstudio apply-patch \
-        win-up win-down win-cloud win-status win-test win-claude win-claude-direct
+        public public-stop public-add public-list \
+        win-up win-down win-cloud win-status win-test win-claude win-claude-direct \
+        win-public win-public-stop
 
 help:
 	@echo "Stack lifecycle (the unified entry point is bin/emr):"
@@ -15,6 +17,10 @@ help:
 	@echo "  make down          - stop core services"
 	@echo "  make status        - run runtime verification"
 	@echo "  make webui         - open Open WebUI in your browser (http://localhost:3000)"
+	@echo "  make public        - start public WebUI stack (port 3001, per-user sessions)"
+	@echo "  make public-stop   - stop the public WebUI (main :3000 is unaffected)"
+	@echo "  make public-add NAME=\"ชื่อ\" - add a user and print their personal URL"
+	@echo "  make public-list   - list all public users"
 	@echo "  make cleanup       - remove containers + images + host wrappers (keeps models)"
 	@echo "  make wipe          - DELETE EVERYTHING incl. models (typed confirmation)"
 	@echo "  make uninstall     - interactive uninstall menu"
@@ -146,6 +152,22 @@ cloud-models:
 lmstudio:
 	bash scripts/37-setup-lmstudio.sh
 
+# Public (no-login) access on port PUBLIC_WEBUI_PORT (default 3001)
+# Enable:  make public          — starts the public Open WebUI instance
+# Disable: make public-stop     — stops it (main :3000 is unaffected)
+public:
+	bash scripts/01-public.sh start
+
+public-stop:
+	bash scripts/01-public.sh stop
+
+public-add:
+	@test -n "$(NAME)" || { echo "Usage: make public-add NAME=\"ชื่อผู้ใช้\""; exit 2; }
+	bash scripts/40-public-users.sh add "$(NAME)"
+
+public-list:
+	bash scripts/40-public-users.sh list
+
 # ---------------------------------------------------------------------------
 # Windows-native Ollama mode — Ollama runs as ollama.exe on the Windows host.
 # These targets use docker-compose.windows.yml + .env.windows + .env.versions.
@@ -174,6 +196,12 @@ win-claude:
 
 win-claude-direct:
 	powershell -ExecutionPolicy Bypass -File scripts\win-claude-local.ps1 -Direct
+
+win-public:
+	$(WIN_COMPOSE) --profile public up -d open-webui-public
+
+win-public-stop:
+	$(WIN_COMPOSE) --profile public stop open-webui-public
 
 # Usage: make apply-patch P=/tmp/web.patch [COMMIT=1 PUSH=1 PR=1] [FORCE=1] [MSG="subject"]
 # MSG is forwarded as a single argument so spaces/quotes survive, e.g.:
