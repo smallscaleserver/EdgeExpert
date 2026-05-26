@@ -158,6 +158,17 @@ model_list:
       model: ollama/qwen3-coder-32k:latest
       api_base: http://ollama:11434
 
+  - model_name: qwen3-coder-next
+    litellm_params:
+      model: ollama/qwen3-coder-next:latest
+      api_base: http://ollama:11434
+
+  # qwen3.6:27b — dense 27B, Gated DeltaNet, 262K context, SWE-bench 77.2%
+  - model_name: qwen3.6:27b
+    litellm_params:
+      model: ollama/qwen3.6:27b
+      api_base: http://ollama:11434
+
   # qwen2.5-vl — vision + language
   - model_name: qwen2.5vl
     litellm_params:

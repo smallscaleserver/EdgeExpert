@@ -223,6 +223,15 @@ model_list:
       timeout: 21600
       stream_timeout: 21600
 
+  # qwen3-coder-next: 52B next-gen coder, 256K context (DGX Spark recommended, 52GB).
+  - model_name: qwen3-coder-next
+    litellm_params:
+      model: openai/qwen3-coder-next:latest
+      api_base: http://host.docker.internal:11434/v1
+      api_key: ollama
+      timeout: 21600
+      stream_timeout: 21600
+
   # --- Mistral coding agents -------------------------------------------------
   - model_name: devstral
     litellm_params:
