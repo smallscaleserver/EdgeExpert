@@ -223,4 +223,3 @@ litellm_settings:
 
 general_settings:
   max_request_timeout: 21600
-  master_key: os.environ/LITELLM_MASTER_KEY

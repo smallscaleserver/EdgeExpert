@@ -150,9 +150,10 @@ services:
       - --config=/app/config.yaml
       - --port=4000
       - --host=0.0.0.0
+      - --request_timeout=21600
 
     volumes:
-      - ./litellm/config.yaml:/app/config.yaml:ro
+      - ./litellm/${LITELLM_CONFIG_FILE:-config.yaml}:/app/config.yaml:ro
 
     extra_hosts:
       # Lets LiteLLM reach a host-side LM Studio (default :1234) at

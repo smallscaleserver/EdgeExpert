@@ -394,4 +394,3 @@ router_settings:
 
 general_settings:
   max_request_timeout: 21600  # 6 hours
-  master_key: os.environ/LITELLM_MASTER_KEY
