@@ -208,6 +208,7 @@ services:
       ENABLE_OPENAI_API: ${ENABLE_OPENAI_API:-true}
       OPENAI_API_BASE_URL: http://litellm:4000/v1
       OPENAI_API_KEY: ${LITELLM_MASTER_KEY:-sk-noop}
+      DEFAULT_MODELS: "gpt-oss:20b"
 
     # Separate data dir — public conversations don't mix with admin account
     volumes:
