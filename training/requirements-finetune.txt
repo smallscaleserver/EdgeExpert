@@ -1,27 +1,20 @@
 # =============================================================================
 # requirements-finetune.txt — added on top of nvcr.io/nvidia/pytorch base
 # Base already provides: torch 2.6, CUDA 12.6, basic transformers
+#
+# No version pins — let pip resolve compatible versions.
+# Key constraint: unsloth requires trl<=0.15.2; pinning trl>=1.x breaks it.
 # =============================================================================
 
-# Core fine-tuning stack
-# Use plain 'unsloth' — torch is already in base image; specifying cu126-torch260
-# would reinstall torch and conflict with the container's system torch.
 unsloth
 unsloth_zoo
-peft>=0.19.0
-trl>=1.4.0
-bitsandbytes>=0.44.0
-datasets>=4.8.5
-accelerate>=1.13.0
-
-# Model / tokenizer support
+peft
+trl
+bitsandbytes
+datasets
+accelerate
 sentencepiece
 protobuf
 einops
-# xformers excluded — requires torch at build time and conflicts with base image
-
-# Logging
-wandb>=0.27.0
-
-# Dataset generation helper
-requests>=2.32.0
+wandb
+requests
