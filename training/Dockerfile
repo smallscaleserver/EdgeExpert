@@ -13,11 +13,14 @@ FROM ${PYTORCH_IMAGE}
 WORKDIR /tmp/build
 
 COPY requirements-finetune.txt .
-# --no-build-isolation: pip builds packages inside the current env so it can
-# find the system torch that ships in the base image. Without this, packages
-# like xformers (pulled in by unsloth) fail because their isolated build env
-# has no torch.
-RUN pip install --no-cache-dir --no-build-isolation -r requirements-finetune.txt \
+# Two-step install to preserve the base image's CUDA torch.
+# Step 1: install unsloth + unsloth_zoo with --no-deps so pip does NOT pull
+#   in a CPU torch from PyPI and overwrite the container's CUDA-enabled torch.
+# Step 2: install all other deps normally (they don't touch torch).
+RUN pip install --no-cache-dir --no-build-isolation --no-deps unsloth unsloth_zoo \
+ && pip install --no-cache-dir --no-build-isolation \
+    peft trl bitsandbytes datasets accelerate \
+    sentencepiece protobuf einops wandb requests \
  && rm -rf /tmp/build /root/.cache/pip
 
 WORKDIR /workspace/training
