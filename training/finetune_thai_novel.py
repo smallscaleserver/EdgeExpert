@@ -52,7 +52,7 @@ def main():
     from transformers import (
         AutoModelForCausalLM, AutoTokenizer,
         Trainer, TrainingArguments,
-        DataCollatorForLanguageModeling,
+        default_data_collator,
     )
     from peft import LoraConfig, get_peft_model, TaskType
 
@@ -109,7 +109,9 @@ def main():
     # ------------------------------------------------------------------
     raw_ds = load_dataset(DATASET_PATH)
 
-    # Tokenize — convert ChatML messages → token ids
+    tokenizer.padding_side = "right"
+
+    # Tokenize with fixed-length padding — avoids variable-length collator issues
     def tokenize(examples):
         texts = [
             tokenizer.apply_chat_template(
@@ -121,14 +123,19 @@ def main():
             texts,
             truncation=True,
             max_length=MAX_SEQ_LEN,
-            padding=False,
+            padding="max_length",
         )
-        out["labels"] = out["input_ids"].copy()
+        # Mask pad tokens in labels with -100 so loss ignores them
+        out["labels"] = [
+            [-100 if t == tokenizer.pad_token_id else t for t in ids]
+            for ids in out["input_ids"]
+        ]
         return out
 
     dataset = raw_ds.map(tokenize, batched=True, remove_columns=raw_ds.column_names)
+    dataset = dataset.with_format("torch")
 
-    collator = DataCollatorForLanguageModeling(tokenizer, mlm=False)
+    collator = default_data_collator
 
     # ------------------------------------------------------------------
     # 5. Train — vanilla Trainer (no trl API quirks)
@@ -156,7 +163,7 @@ def main():
         ),
         train_dataset=dataset,
         data_collator=collator,
-        processing_class=tokenizer,
+        tokenizer=tokenizer,
     )
 
     print(f"[train] epochs={EPOCHS}, eff_batch={BATCH_SIZE*GRAD_ACCUM}, lr={LR}, seq={MAX_SEQ_LEN}")
