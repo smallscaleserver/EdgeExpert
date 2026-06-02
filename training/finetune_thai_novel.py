@@ -51,10 +51,10 @@ def main():
     import torch
     from transformers import (
         AutoModelForCausalLM, AutoTokenizer,
-        TrainingArguments, DataCollatorForSeq2Seq
+        Trainer, TrainingArguments,
+        DataCollatorForLanguageModeling,
     )
     from peft import LoraConfig, get_peft_model, TaskType
-    from trl import SFTTrainer, SFTConfig
 
     args = parse_args()
 
@@ -107,29 +107,37 @@ def main():
     # ------------------------------------------------------------------
     # 4. Dataset
     # ------------------------------------------------------------------
-    dataset = load_dataset(DATASET_PATH)
+    raw_ds = load_dataset(DATASET_PATH)
 
-    def apply_template(examples):
+    # Tokenize — convert ChatML messages → token ids
+    def tokenize(examples):
         texts = [
             tokenizer.apply_chat_template(
                 m, tokenize=False, add_generation_prompt=False
             )
             for m in examples["messages"]
         ]
-        return {"text": texts}
+        out = tokenizer(
+            texts,
+            truncation=True,
+            max_length=MAX_SEQ_LEN,
+            padding=False,
+        )
+        out["labels"] = out["input_ids"].copy()
+        return out
 
-    dataset = dataset.map(apply_template, batched=True)
+    dataset = raw_ds.map(tokenize, batched=True, remove_columns=raw_ds.column_names)
+
+    collator = DataCollatorForLanguageModeling(tokenizer, mlm=False)
 
     # ------------------------------------------------------------------
-    # 5. Train
+    # 5. Train — vanilla Trainer (no trl API quirks)
     # ------------------------------------------------------------------
     resume = args.resume and os.path.isdir(OUTPUT_DIR)
 
-    trainer = SFTTrainer(
+    trainer = Trainer(
         model=model,
-        tokenizer=tokenizer,
-        train_dataset=dataset,
-        args=SFTConfig(
+        args=TrainingArguments(
             output_dir=OUTPUT_DIR,
             num_train_epochs=EPOCHS,
             per_device_train_batch_size=BATCH_SIZE,
@@ -142,12 +150,13 @@ def main():
             logging_steps=5,
             save_steps=SAVE_STEPS,
             save_total_limit=3,
-            dataset_text_field="text",
-            max_seq_length=MAX_SEQ_LEN,
-            packing=True,
             report_to="none",
             gradient_checkpointing=True,
+            remove_unused_columns=False,
         ),
+        train_dataset=dataset,
+        data_collator=collator,
+        processing_class=tokenizer,
     )
 
     print(f"[train] epochs={EPOCHS}, eff_batch={BATCH_SIZE*GRAD_ACCUM}, lr={LR}, seq={MAX_SEQ_LEN}")
