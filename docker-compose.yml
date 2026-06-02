@@ -420,6 +420,61 @@ services:
         max-file: "2"
 
   # ---------------------------------------------------------------------------
+  # OPTIONAL: Fine-tune (unsloth QLoRA — build locally, version-tagged)
+  # Build : docker compose --profile finetune build finetune
+  # Train : docker compose --profile finetune run --rm finetune \
+  #           python /workspace/scripts/finetune_thai_novel.py --export-gguf q8_0
+  # Dataset: docker compose --profile finetune run --rm finetune \
+  #           python /workspace/scripts/make_dataset.py --count 500
+  # Remove: docker rmi $(grep FINETUNE_IMAGE .env.versions | cut -d= -f2)
+  # ---------------------------------------------------------------------------
+  finetune:
+    build:
+      context: ./training
+      dockerfile: Dockerfile
+      args:
+        PYTORCH_IMAGE: ${TRAINING_IMAGE}
+    image: ${FINETUNE_IMAGE}
+    container_name: edge-finetune
+    profiles: ["finetune"]
+    restart: "no"
+
+    environment:
+      HF_HOME: /root/.cache/huggingface
+      HF_TOKEN: ${HF_TOKEN:-}
+      WANDB_API_KEY: ${WANDB_API_KEY:-}
+      OLLAMA_URL: http://edge-ollama:11434
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+      NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+
+    volumes:
+      - ${AI_DATA_ROOT}/training:/workspace/training
+      - ${AI_DATA_ROOT}/hf-cache:/root/.cache/huggingface
+      - ./training:/workspace/scripts:ro
+
+    working_dir: /workspace/training
+
+    command: bash
+    stdin_open: true
+    tty: true
+    ipc: host
+
+    ports:
+      - "${TENSORBOARD_PORT:-6006}:6006"
+      - "${JUPYTER_PORT:-8888}:8888"
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+    networks:
+      - edge-ai-net
+
+  # ---------------------------------------------------------------------------
   # OPTIONAL: Training (PyTorch interactive shell)
   # Enable: docker compose --profile training run --rm training bash
   # ---------------------------------------------------------------------------
