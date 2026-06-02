@@ -60,26 +60,28 @@ WebUI uses `http://ollama:11434` (Docker DNS), not `localhost` — the latter wo
 Compose profiles let you keep optional services in the same `docker-compose.yml` without affecting `compose up` defaults:
 
 ```bash
-compose up -d                            # only ollama + open-webui
-compose --profile vllm up -d vllm        # adds vLLM
-compose --profile training run --rm training bash   # one-shot training shell
+compose up -d                                    # only ollama + open-webui
+compose --profile cloud up -d litellm            # adds LiteLLM (cloud models)
+compose --profile coding-web up -d openhands     # adds OpenHands web IDE
+compose --profile vllm up -d vllm               # adds vLLM
+compose --profile training run --rm training bash    # PyTorch interactive shell
+compose --profile finetune run --rm finetune bash    # unsloth QLoRA fine-tune shell
 ```
 
-## aider coding CLI
+The `finetune` profile uses a locally-built image (`edge-finetune:v1.0`) on top of the NVIDIA PyTorch base. Build once with `bash scripts/40-build-finetune.sh`; remove with `--remove` when done to free ~25 GB disk.
 
-aider is an AI pair-programming CLI that can edit files, run shell commands, and make git commits. It is delivered as a **host launcher** (not a Compose service) for two reasons:
+## AI coding agents
 
-1. **No service lifecycle friction** — the user `cd`s into any repo and runs `bash scripts/06-coding-cli.sh`; no `compose up`, no network to join, no per-project config.
-2. **Correct git identity** — `~/.gitconfig` and `~/.ssh` are bind-mounted read-only at `docker run` time, so commits always carry the calling user's identity regardless of which repo is being edited.
+**Roo (primary):** VS Code extension connecting directly to Ollama (port 11434) or LiteLLM (port 4000). No server-side config needed. See `docs/AI-CODING-SETUP.md` Option G.
 
-The image tag is pinned in `.env.versions` (`AIDER_CLI_IMAGE`). Local mode points at `edge-ollama:11434/v1` (zero outbound AI traffic). Cloud mode goes through `edge-litellm:4000/v1` → Anthropic, gated by `LITELLM_MASTER_KEY`.
-
+**aider (secondary):** Docker-based CLI for terminal workflows.
+```bash
+bash scripts/06-coding-cli.sh          # local Ollama
+bash scripts/06-coding-cli.sh --cloud  # LiteLLM → Anthropic
 ```
-bash scripts/06-coding-cli.sh          # local (Ollama, no outbound calls)
-bash scripts/06-coding-cli.sh --cloud  # cloud (LiteLLM → Anthropic)
-```
+Persistent config under `${AI_DATA_ROOT}/coding-cli/`. Git identity comes from host `~/.gitconfig` (bind-mounted read-only).
 
-Persistent aider config lives under `${AI_DATA_ROOT}/coding-cli/`.
+**OpenHands:** Browser-based agent at `http://<host>:3030`. Runs via `--profile coding-web`.
 
 ## Cleanup decision tree
 

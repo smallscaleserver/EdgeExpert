@@ -12,18 +12,18 @@
 
 ```bash
 bash scripts/01-start.sh
-bash scripts/04-pull-model.sh qwen2.5-coder:14b
+bash scripts/04-pull-model.sh qwen3-coder:30b
 bash scripts/03-verify.sh
 ```
 
 จากนั้นเปิด `http://localhost:3000`
 
-> ถ้าเครื่อง VRAM น้อย ให้ใช้ `qwen2.5-coder:7b`
+> ถ้าต้องการ model เล็กลง ให้ใช้ `qwen2.5-coder:7b`
 
 ## 2) ตั้งค่า Model Preset ใน Open WebUI
 
 1. เข้า **Workspace → Models**
-2. เลือก `qwen2.5-coder:*`
+2. เลือก `qwen3-coder:30b` หรือ `qwen3-coder-next:latest`
 3. ตั้ง **System Prompt** เป็น template ด้านล่าง
 4. ตั้ง Temperature = `0.1` ถึง `0.2`
 5. เปิดใช้งาน model เป็นค่า default สำหรับงานโค้ด

@@ -6,18 +6,21 @@
 docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi
 ```
 
-If this fails, NVIDIA Container Toolkit is not configured:
+If this fails, NVIDIA Container Toolkit is not configured. Run once:
 
 ```bash
-sudo nvidia-ctk runtime configure --runtime=docker
+sudo nvidia-ctk runtime configure --runtime=docker   # adds nvidia to daemon.json
 sudo systemctl restart docker
+docker compose --env-file .env --env-file .env.versions up -d --force-recreate ollama
 ```
 
-Verify:
+Verify GPU is actually used (not CPU fallback):
 ```bash
-docker info | grep -i runtime
-# Should show: nvidia
+docker exec edge-ollama ollama ps
+# PROCESSOR column must show "100% GPU", not "100% CPU"
 ```
+
+> **DGX Spark note:** `daemon.json` only has DNS by default — the nvidia runtime is NOT pre-configured. The three steps above are required even on DGX OS.
 
 ## "permission denied" on `/mnt/edge-backup/ai-data`
 
@@ -60,7 +63,7 @@ OLLAMA_MAX_LOADED_MODELS=1
 OLLAMA_NUM_PARALLEL=1
 ```
 
-Or pick a smaller quantization (e.g. `qwen2.5-coder:7b-instruct-q4_K_M`).
+Or pick a smaller model (e.g. `qwen2.5-coder:7b` instead of `qwen3-coder-next`).
 
 Restart:
 ```bash
@@ -132,15 +135,16 @@ For cloud mode, check that the model name matches an entry in `litellm/config.ya
 grep model_name litellm/config.yaml
 ```
 
-## aider: "Tool-calling unsupported"
+## aider / Roo: "Tool-calling unsupported" or wrong tool format
 
-aider requires function-calling support. Not all models support it:
+Models that reliably support tool-calling on this stack:
 
-- ✅ Local: `qwen2.5-coder:7b`, `qwen2.5-coder:14b`, `qwen2.5-coder:32b`
-- ✅ Cloud: `claude-sonnet-4-6`, `claude-opus-4-7`
-- ❌ `nemotron` (instruct only, no tool-calling schema)
+- ✅ Local (server): `qwen3-coder-next`, `qwen3.6:27b`, `qwen3-coder:30b`, `devstral`
+- ✅ Local (Windows): `qwen3-coder-32k`, `devstral-stable`, `devstral-cpu-native`
+- ✅ Cloud: `claude-sonnet-4-6`, `claude-opus-4-7`, `gpt-4o`
+- ❌ `nemotron`, `gemma4` — no tool-calling schema
 
-Switch model with `--model <name>`.
+For Roo on server, connect directly via Ollama (port 11434) rather than LiteLLM to avoid any proxy tool-call translation issues.
 
 ## Weekly disk report (cron suggestion)
 
