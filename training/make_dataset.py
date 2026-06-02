@@ -85,7 +85,7 @@ def generate_one(prompt: str, session: requests.Session) -> str | None:
             {"role": "user",   "content": prompt},
         ],
         "stream": False,
-        "options": {"temperature": 0.9, "top_p": 0.95, "num_predict": 1024},
+        "options": {"temperature": 0.9, "top_p": 0.95, "num_predict": -1, "num_ctx": 32768},
     }
     try:
         r = session.post(f"{OLLAMA_URL}/api/chat", json=payload, timeout=300)
@@ -107,6 +107,7 @@ def to_chatml(prompt: str, response: str) -> dict:
 
 
 def main():
+    global OLLAMA_URL, GEN_MODEL
     p = argparse.ArgumentParser()
     p.add_argument("--count", type=int, default=DEFAULT_N)
     p.add_argument("--resume", action="store_true")
@@ -115,7 +116,6 @@ def main():
     p.add_argument("--output", default=OUTPUT_FILE)
     args = p.parse_args()
 
-    global OLLAMA_URL, GEN_MODEL
     OLLAMA_URL = args.ollama_url
     GEN_MODEL  = args.model
 

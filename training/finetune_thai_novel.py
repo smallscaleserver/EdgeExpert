@@ -21,7 +21,7 @@ DATASET_PATH = os.getenv("DATASET_PATH", "/workspace/training/dataset/train.json
 OUTPUT_DIR   = os.getenv("OUTPUT_DIR",   "/workspace/training/output/qwen3-14b-thai-novel")
 HF_TOKEN     = os.getenv("HF_TOKEN",     None)
 
-MAX_SEQ_LEN  = int(os.getenv("MAX_SEQ_LEN",  "16384"))
+MAX_SEQ_LEN  = int(os.getenv("MAX_SEQ_LEN",  "32768"))
 LORA_RANK    = int(os.getenv("LORA_RANK",    "64"))
 BATCH_SIZE   = int(os.getenv("BATCH_SIZE",   "2"))
 GRAD_ACCUM   = int(os.getenv("GRAD_ACCUM",   "16"))   # effective batch = 32
@@ -55,6 +55,7 @@ def load_dataset_jsonl(path: str):
 def main():
     args = parse_args()
 
+    import torch
     from unsloth import FastLanguageModel
     from unsloth.chat_templates import get_chat_template
     from trl import SFTTrainer, SFTConfig
