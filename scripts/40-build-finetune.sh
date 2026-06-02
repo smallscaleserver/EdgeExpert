@@ -11,8 +11,12 @@ set -euo pipefail
 # shellcheck source=scripts/lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-IMAGE=$(env_get FINETUNE_IMAGE)
-PYTORCH_BASE=$(env_get TRAINING_IMAGE)
+# Image tags live in .env.versions, not .env — read directly
+VERSIONS_FILE="$REPO_ROOT/.env.versions"
+_ver_get() { awk -F= -v k="$1" '/^[[:space:]]*#/{next} $1==k{sub(/^[^=]*=/,"");print;exit}' "$VERSIONS_FILE"; }
+
+IMAGE=$(        _ver_get FINETUNE_IMAGE)
+PYTORCH_BASE=$( _ver_get TRAINING_IMAGE)
 
 case "${1:-}" in
   --remove)

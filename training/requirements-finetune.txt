@@ -4,7 +4,9 @@
 # =============================================================================
 
 # Core fine-tuning stack
-unsloth[cu126-torch260]
+# Use plain 'unsloth' — torch is already in base image; specifying cu126-torch260
+# would reinstall torch and conflict with the container's system torch.
+unsloth
 unsloth_zoo
 peft>=0.19.0
 trl>=1.4.0
@@ -16,6 +18,7 @@ accelerate>=1.13.0
 sentencepiece
 protobuf
 einops
+# xformers excluded — requires torch at build time and conflicts with base image
 
 # Logging
 wandb>=0.27.0

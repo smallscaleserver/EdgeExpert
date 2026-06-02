@@ -1,94 +1,70 @@
 # Model recommendations
 
-Pick based on your VRAM and use case. All examples assume Ollama; any model from the [Ollama library](https://ollama.com/library) works.
+## DGX Spark GB10 (128 GB unified — primary server)
 
-## Nemotron family
+| Model | Size | Speed | Best for |
+|---|---|---|---|
+| `qwen3-coder-next:latest` | 51 GB | 49 tok/s | flagship agentic coding, 256K context |
+| `qwen3.6:27b` | 17 GB | ~70 tok/s | reasoning + coding, SWE-bench 77.2% |
+| `qwen3-coder:30b` | 18 GB | ~65 tok/s | agentic coding, smaller than next |
+| `qwen3-coder-32k:latest` | 18 GB | ~65 tok/s | qwen3-coder custom 32K context |
+| `gemma4-32k:latest` | 17 GB | ~60 tok/s | general + vision |
+| `gpt-oss:20b` | 13 GB | ~80 tok/s | public WebUI default (port 3001) |
+| `qwen2.5-coder:7b` | 4.7 GB | 66 tok/s | fast utility tasks |
+| `localmodel26b:latest` | 17 GB | ~60 tok/s | custom fine-tune |
+| `nomic-embed-text` | small | — | embeddings |
 
-NVIDIA's Nemotron line is a first-class option on this stack. Use the helper script to pick the right variant for your VRAM:
+All models run **100% GPU** on GB10 after the nvidia-ctk runtime fix (2026-06-03).
 
-```bash
-bash scripts/0a-pull-nemotron.sh nano   # default
-```
+## Intel Arc 140T Windows laptop (36 GB Vulkan VRAM shared)
 
-| Variant | Ollama tag | Active params | VRAM (rough) | Notes |
+Requires `OLLAMA_VULKAN=1` + `VK_ICD_FILENAMES` set. Use `num_batch=64` Modelfile to avoid Windows TDR crash. See `docs/WINDOWS-SETUP.md`.
+
+| Model | Size | GPU layers | Speed | Notes |
 |---|---|---|---|---|
-| `mini` | `nemotron-mini` | 4B | ~6 GB | Assistant. Function calling, RAG, edge deployment. |
-| `nano` | `nemotron-3-nano` | 3.5B active / 30B MoE | ~20 GB | **Reasoning.** Unified reasoning + non-reasoning agent. |
-| `nano-omni` | `nemotron3:33b` | 33B multimodal | ~24 GB | Multimodal (video + audio + image + text). Requires a multimodal-capable Ollama build. |
-| `super` | `nemotron-3-super` | 12B active / 120B MoE | ~80 GB | **Reasoning.** Strong agent / IT automation. |
-| `cascade` | `nemotron-cascade-2` | 3B active / 30B MoE | ~20 GB | Agentic, low active-param footprint. |
-| `70b` | `nemotron` | 70B (Llama-3.1-Nemotron) | ~48 GB (q4) | Assistant. RLHF-tuned for helpfulness. |
+| `qwen3-coder-32k` | 18 GB | full | ~5 tok/s | best for Claude Code tool-use |
+| `qwen2.5-coder-14b-stable` | 9 GB | full | ~10 tok/s | stable num_batch=64 variant |
+| `devstral-stable` | 14 GB | full | ~4 tok/s | agentic coding, num_batch=64 |
+| `devstral-cpu-native` | 14 GB | CPU | ~2 tok/s | no Vulkan crash, reliable |
+| `qwen2.5-coder-cpu` | 4.7 GB | CPU | ~4 tok/s | always stable fallback |
 
-Reasoning variants: **Nano**, **Super**. Assistant variants: **Mini**, **70B**.
+## By use case
 
-Links: [NVIDIA Nemotron hub](https://developer.nvidia.com/nemotron) · [NVIDIA Open Model License](https://developer.download.nvidia.com/licenses/nvidia-open-model-license-agreement.pdf)
+**Roo / agentic coding (server):** `qwen3-coder-next` → `qwen3.6:27b` → `qwen3-coder`
 
-## By VRAM
+**Claude Code local (Windows via LiteLLM):** `qwen3-coder-32k` or `devstral-stable`
 
-### 4–8 GB VRAM
+**Open WebUI chat:** Any model — default public port 3001 uses `gpt-oss:20b`
 
-| Model | Size | Use case |
-|---|---|---|
-| `qwen2.5-coder:7b` | ~4.7 GB | coding |
-| `llama3.2:3b` | ~2 GB | general chat |
-| `phi3.5:3.8b` | ~2.2 GB | reasoning |
-| `mistral:7b` | ~4.1 GB | general |
-| `gemma2:2b` | ~1.6 GB | tiny / fast |
+**Embeddings:** `nomic-embed-text`
 
-### 12–16 GB VRAM
+**Fine-tune base:** `Qwen/Qwen3-14B` base (HuggingFace) via `edge-finetune:v1.0` image
 
-| Model | Size | Use case |
-|---|---|---|
-| `qwen2.5-coder:14b` | ~8.7 GB | strong coding |
-| `llama3.1:8b-instruct-q8_0` | ~8.5 GB | high-quality general |
-| `mistral-nemo:12b` | ~7 GB | long context |
-| `deepseek-coder-v2:16b` | ~9 GB | coding (MoE) |
-| `gpt-oss:20b` | ~13 GB | OpenAI open-weights — same model the LM Studio [video](https://www.youtube.com/watch?v=Cyn_Dm05_eU) uses; works well with Claude Code via Option D (`claude-local-gpt-oss`) |
-
-### 24+ GB VRAM
-
-| Model | Size | Use case |
-|---|---|---|
-| `qwen2.5-coder:32b` | ~19 GB | top-tier coding |
-| `llama3.3:70b-instruct-q4_K_M` | ~42 GB | top-tier general |
-| `mixtral:8x7b` | ~26 GB | MoE general |
-
-## By task
-
-**Coding:** `qwen2.5-coder:*`, `deepseek-coder-v2:*`, `codestral:*`
-**General chat:** `llama3.1:*`, `llama3.2:*`, `mistral:*`
-**Long context:** `mistral-nemo:12b`, `qwen2.5:7b-instruct-q5_K_M` (128k)
-**Function calling:** `qwen2.5:*-instruct`, `llama3.1:*-instruct`
-**Vision:** `llava:*`, `llama3.2-vision:*`
-
-## Quantization quick guide
-
-Tag suffix → quality vs size:
-
-- `q8_0` — near-FP16 quality, largest
-- `q5_K_M` — sweet spot, recommended default
-- `q4_K_M` — smaller, slight quality drop
-- `q3_K_M` — small, noticeable quality drop
-- `q2_K` — tiny, often broken
-
-Default tag (e.g. `qwen2.5-coder:7b`) is usually `q4_K_M` — fine for most uses.
-
-## Pulling
+## Pulling models
 
 ```bash
-bash scripts/04-pull-model.sh qwen2.5-coder:7b
-bash scripts/04-pull-model.sh llama3.1:8b-instruct-q5_K_M
+# On server
+docker exec edge-ollama ollama pull qwen3-coder-next:latest
+bash scripts/04-pull-model.sh qwen3-coder-next:latest   # via emr
+
+# On Windows (Ollama native)
+ollama pull qwen3-coder-32k
 ```
+
+## Quantization guide
+
+| Suffix | Quality | Size |
+|---|---|---|
+| `q8_0` | near-FP16 | largest |
+| `q5_K_M` | recommended | mid |
+| `q4_K_M` | default Ollama | smaller |
+| `q2_K` | avoid | tiny / broken |
 
 ## Disk planning
 
-Rough disk usage at common quantizations:
-
-| Param count | q4_K_M | q5_K_M | q8_0 |
-|---|---|---|---|
-| 3B | ~2 GB | ~2.5 GB | ~3.5 GB |
-| 7B | ~4.5 GB | ~5.5 GB | ~7.5 GB |
-| 8B | ~5 GB | ~6 GB | ~8.5 GB |
-| 14B | ~9 GB | ~10 GB | ~15 GB |
-| 32B | ~20 GB | ~23 GB | ~34 GB |
-| 70B | ~42 GB | ~50 GB | ~75 GB |
+| Params | q4_K_M | q8_0 |
+|---|---|---|
+| 7B | ~4.5 GB | ~7.5 GB |
+| 14B | ~9 GB | ~15 GB |
+| 27–30B | ~17 GB | ~30 GB |
+| 50B+ | ~30 GB | ~55 GB |

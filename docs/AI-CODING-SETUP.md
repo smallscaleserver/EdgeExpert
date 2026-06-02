@@ -1,14 +1,38 @@
 # AI-assisted coding on this stack
 
-Six ways to use this runtime. Pick one — they coexist.
+Seven ways to use this runtime. Pick one — they coexist.
 
-| | A · OpenCode | B · Claude Code + Ollama worker | C · Unified Web UI | D · Claude Code on local Ollama | E · OpenHands web IDE | F · Claude Code on LM Studio |
-|---|---|---|---|---|---|---|
-| Main interface | TUI | TUI | Open WebUI (browser) | TUI | OpenHands (browser) | TUI |
-| Main agent | OpenCode (open source) | Claude Code (subscription) | Whatever model you pick from the dropdown | Claude Code — brain is Ollama | OpenHands agent (open source) | Claude Code — brain is LM Studio |
-| Inference | 100% local Ollama | Cloud Claude **+** local Ollama for offload | Local Ollama **and** cloud (Claude/GPT/Gemini) in one menu | 100% local Ollama (via LiteLLM) | Any model from LiteLLM | 100% local LM Studio (host desktop app) |
-| Cost | $0 | Claude subscription | $0 local / pay cloud | $0 | $0 local / pay cloud | $0 |
-| Best when | offline / privacy required | hardest reasoning, multi-file refactor | quick chat, comparing models | you like Claude Code's UX but want a local Ollama model | "Codex / claude.ai/code"-style web flow | already manage models in LM Studio (GGUF, MLX, Anthropic-compat endpoint) — same UX as the [YouTube walkthrough](https://www.youtube.com/watch?v=Cyn_Dm05_eU) |
+| | G · Roo | A · OpenCode | B · Claude Code + Ollama worker | C · Unified Web UI | D · Claude Code on local Ollama | E · OpenHands web IDE | F · Claude Code on LM Studio |
+|---|---|---|---|---|---|---|---|
+| Main interface | VS Code extension | TUI | TUI | Open WebUI (browser) | TUI | OpenHands (browser) | TUI |
+| Main agent | Roo (open source) | OpenCode (open source) | Claude Code (subscription) | Any model in dropdown | Claude Code — brain is Ollama | OpenHands (open source) | Claude Code — brain is LM Studio |
+| Inference | Ollama direct or LiteLLM | 100% local Ollama | Cloud Claude + local Ollama | Local + cloud in one menu | 100% local Ollama (via LiteLLM) | Any model from LiteLLM | 100% local LM Studio |
+| Cost | $0 | $0 | Claude subscription | $0 local / pay cloud | $0 | $0 local / pay cloud | $0 |
+| Best when | everyday coding in VS Code | offline / no VS Code | hardest multi-file refactor | quick chat, comparing models | Claude Code UX on local model | web-based agent + GitHub | already use LM Studio |
+
+## Option G — Roo (recommended default)
+
+[Roo](https://marketplace.visualstudio.com/items?itemName=rooveterinaryinc.roo-cline) is a VS Code extension for agentic coding. Works directly with Ollama — no proxy needed for the server.
+
+**Install:** VS Code Marketplace → search `rooveterinaryinc.roo-cline`
+
+**Connect to DGX Spark server:**
+- API Provider: `Ollama`
+- Base URL: `http://10.88.1.254:11434`
+- Model: `qwen3-coder-next:latest` or `qwen3.6:27b`
+
+**Connect via LiteLLM (cloud + local in one list):**
+- API Provider: `OpenAI Compatible`
+- Base URL: `http://10.88.1.254:4000/v1`
+- API Key: value of `LITELLM_MASTER_KEY` from `.env`
+- Model: `qwen3-coder`, `qwen3-coder-next`, `claude-sonnet-4-6`, etc.
+
+**Set timeout** (VS Code user settings):
+```json
+"roo-cline.apiRequestTimeout": 3600
+```
+
+> **qwen3 thinking tokens:** If you see `<think>` tags in output, route through LiteLLM — it strips them cleanly.
 
 Both options share the same **local MCP worker** at
 [`scripts/lib/ollama-mcp-server.py`](../scripts/lib/ollama-mcp-server.py),
@@ -17,25 +41,21 @@ a tiny Python-stdlib stdio server that exposes Ollama as MCP tools:
 
 ---
 
-## Prerequisites (both options)
+## Prerequisites (all options)
 
 ```bash
-# Stack up and at least one coding model installed
+# Stack up (server)
 bash scripts/01-start.sh
-bash scripts/04-pull-model.sh qwen2.5-coder:7b      # or :14b / :32b for more VRAM
 
-# Optional, only needed for ollama_embed
-bash scripts/04-pull-model.sh nomic-embed-text
+# Recommended coding models — see docs/MODEL-RECOMMENDATIONS.md
+bash scripts/04-pull-model.sh qwen3-coder-next:latest   # DGX Spark flagship
+bash scripts/04-pull-model.sh qwen3-coder:30b           # lighter alternative
+bash scripts/04-pull-model.sh qwen2.5-coder:7b          # fast utility / fallback
+bash scripts/04-pull-model.sh nomic-embed-text          # embeddings (Option B MCP)
 ```
 
-Models suited to coding agents on this stack (see
-[`docs/MODEL-RECOMMENDATIONS.md`](MODEL-RECOMMENDATIONS.md)):
-
-| VRAM | Recommended |
-|---|---|
-| 8 GB  | `qwen2.5-coder:7b` |
-| 16 GB | `qwen2.5-coder:14b`, `deepseek-coder-v2:16b` |
-| 24 GB+| `qwen2.5-coder:32b`, `nemotron-3-nano` |
+Current server models (DGX Spark GB10, all running **100% GPU**):
+`qwen3-coder-next` · `qwen3.6:27b` · `qwen3-coder` · `gpt-oss:20b` · `gemma4-32k` · `qwen2.5-coder:7b`
 
 ---
 
