@@ -63,10 +63,14 @@ def main():
     # 1. Load base model + tokenizer
     # ------------------------------------------------------------------
     print(f"[model] loading {BASE_MODEL} ...")
+    # GB10 has 128 GB unified memory — no need for 4-bit quantization.
+    # bitsandbytes CUDA 13.2 binary is missing in the base image (forward compat),
+    # so load_in_4bit=False; bf16 full LoRA is faster and higher quality anyway.
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=BASE_MODEL,
         max_seq_length=MAX_SEQ_LEN,
-        load_in_4bit=True,
+        load_in_4bit=False,
+        dtype=torch.bfloat16,
         token=HF_TOKEN,
     )
 
