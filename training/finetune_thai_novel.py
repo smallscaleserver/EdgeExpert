@@ -163,7 +163,7 @@ def main():
         ),
         train_dataset=dataset,
         data_collator=collator,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
     )
 
     print(f"[train] epochs={EPOCHS}, eff_batch={BATCH_SIZE*GRAD_ACCUM}, lr={LR}, seq={MAX_SEQ_LEN}")
