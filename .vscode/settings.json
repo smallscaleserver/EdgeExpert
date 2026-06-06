@@ -1,0 +1,5 @@
+{
+  // Roo — point to DGX Spark server (GPU) not localhost (CPU)
+  "roo-cline.ollamaBaseUrl": "http://10.88.1.254:11434",
+  "roo-cline.apiRequestTimeout": 3600
+}
