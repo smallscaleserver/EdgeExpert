@@ -1,5 +1,34 @@
 # Training
 
+---
+
+## ⚠️ MSI EDGEEXPERT — ต้องตั้งค่า GPU ก่อนทุกครั้ง
+
+> ### ❌ อย่าลืม: EDGEEXPERT ตั้งค่าเริ่มต้นเป็น CPU — ต้องสลับเป็น GPU ก่อนรัน training
+>
+> ถ้ายังไม่ได้ตั้งค่า NVIDIA Container Toolkit ไว้ Docker จะรัน training บน **CPU** แทน GPU  
+> ซึ่งทำให้ใช้เวลานานกว่าปกติหลาย 10 เท่า และ model อาจ OOM ได้
+>
+> **→ ดูวิธีตั้งค่า GPU ให้พร้อมใช้งานได้ที่:** [docs/TROUBLESHOOTING.md — "GPU not visible inside container"](../docs/TROUBLESHOOTING.md)
+>
+> ตรวจสอบว่า GPU ทำงานอยู่จริง **ก่อนรัน training ทุกครั้ง**:
+>
+> ```bash
+> # วิธีที่ 1 — ดู Ollama (ต้องเห็น "100% GPU" ไม่ใช่ "100% CPU")
+> docker exec edge-ollama ollama ps
+>
+> # วิธีที่ 2 — NVTOP: ดู GPU utilization + VRAM ขณะ training รันอยู่
+> nvtop
+>
+> # วิธีที่ 3 — HTOP: ถ้า CPU usage พุ่งสูงแต่ NVTOP ไม่ขยับ = รันบน CPU อยู่!
+> htop
+> ```
+>
+> **สัญญาณบอกว่ารันบน CPU (ผิด):** HTOP เห็น CPU 100% / NVTOP ไม่ขยับเลย  
+> **สัญญาณบอกว่ารันบน GPU (ถูก):** NVTOP เห็น GPU % และ VRAM ขึ้น / HTOP CPU ต่ำ
+
+---
+
 Optional fine-tuning workflows. **Not pulled by default** — the PyTorch image is large (~10 GB).
 
 ## Quick start
